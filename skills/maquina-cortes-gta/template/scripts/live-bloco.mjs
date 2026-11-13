@@ -15,7 +15,7 @@ import {execFileSync, spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {gravacao, listBlocks, probeDuration, readJson, writeJson} from './live-comum.mjs';
+import {PROBE, gravacao, listBlocks, probeDuration, readJson, writeJson} from './live-comum.mjs';
 
 const args = process.argv.slice(2);
 const live = args[0];
@@ -66,16 +66,16 @@ console.log(`> Preparando ${alvo.nome}`);
 if (prev && overlap > 0) {
   // fim do bloco anterior (corte sem recodificar: começa no keyframe mais próximo, por isso medimos a duração real)
   const tailFile = path.join(work, 'tail.ts');
-  execFileSync('ffmpeg', ['-y', '-v', 'error', '-ss', String(Math.max(0, prev.dur - overlap)), '-i', prev.arquivo, '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', tailFile]);
+  execFileSync('ffmpeg', ['-y', '-v', 'error', ...PROBE, '-ss', String(Math.max(0, prev.dur - overlap)), '-i', prev.arquivo, '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', tailFile]);
   tail = probeDuration(tailFile);
   const list = path.join(work, 'concat.txt');
   const esc = (p) => path.resolve(p).replace(/\\/g, '/').replace(/'/g, "'\\''");
   fs.writeFileSync(list, `file '${esc(tailFile)}'\nfile '${esc(alvo.arquivo)}'\n`);
-  execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-movflags', '+faststart', source]);
+  execFileSync('ffmpeg', ['-y', '-v', 'error', ...PROBE, '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-movflags', '+faststart', source]);
   fs.rmSync(tailFile);
   fs.rmSync(list);
 } else {
-  execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', alvo.arquivo, '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-movflags', '+faststart', source]);
+  execFileSync('ffmpeg', ['-y', '-v', 'error', ...PROBE, '-i', alvo.arquivo, '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-movflags', '+faststart', source]);
 }
 const offset = alvo.inicio - tail;
 const bottom = path.join(live, 'bottom.mp4');

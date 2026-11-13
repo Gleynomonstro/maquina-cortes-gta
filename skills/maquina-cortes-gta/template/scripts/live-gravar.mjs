@@ -87,9 +87,11 @@ function runOnce() {
     if (isFile) {
       ffmpeg = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', fonte, ...segArgs], {stdio: ['pipe', 'inherit', 'inherit']});
     } else if (!desdeInicio) {
-      // o FFmpeg lê a live direto (HLS) e junta vídeo + áudio sem recodificar
+      // o FFmpeg lê a live direto (HLS) e junta vídeo + áudio sem recodificar.
+      // -copyts: vídeo e áudio começam em pontos diferentes da live (no YouTube, até ~5 s de diferença); sem manter os
+      // tempos originais, os dois seriam zerados separadamente e o som ficaria fora de sincronia com a imagem.
       const inputs = urls.slice(0, 2).flatMap((u) => ['-i', u]);
-      ffmpeg = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, ...segArgs], {stdio: ['pipe', 'inherit', 'inherit']});
+      ffmpeg = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-copyts', ...inputs, ...segArgs], {stdio: ['pipe', 'inherit', 'inherit']});
     } else {
       ytdlp = spawn(
         'yt-dlp',

@@ -20,7 +20,12 @@ export const writeJson = (f, data) => {
 export const probeDuration = (file) =>
   Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], {encoding: 'utf8'}).trim());
 
-export const gravacao = (live) => readJson(path.join(live, 'gravacao.json'), {ativo: false});
+// Ao ler um bloco gravado: no primeiro bloco de uma live do YouTube o áudio pode começar alguns segundos depois do
+// vídeo (é assim na própria live; os tempos originais são mantidos para ficar em sincronia). Com a análise padrão
+// (~5 MB) o FFmpeg nem acha o áudio; estas opções o fazem olhar mais longe.
+export const PROBE = ['-analyzeduration', '30M', '-probesize', '100M'];
+
+export const gravacao =(live) => readJson(path.join(live, 'gravacao.json'), {ativo: false});
 
 // Blocos gravados, em ordem, com o início de cada um na linha do tempo da live (segundos desde o começo da gravação).
 // Só os blocos FECHADOS têm duração definitiva: enquanto a gravação está ativa, o último bloco ainda está crescendo.

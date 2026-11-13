@@ -19,7 +19,7 @@ import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {drawtextFont, filterPath, hms, listBlocks, probeDuration, readJson, writeJson} from './live-comum.mjs';
+import {PROBE, drawtextFont, filterPath, hms, listBlocks, probeDuration, readJson, writeJson} from './live-comum.mjs';
 
 const args = process.argv.slice(2);
 const [live, id] = args;
@@ -145,7 +145,7 @@ for (const [i, p] of partes.entries()) {
   const wmF = wm ? `;[v0][1:v]overlay=W-w-40:36[v]` : ';[v0]null[v]';
   const af = `[0:a]aresample=48000${p.vezes > 1 ? `,${atempo(p.vezes)}` : ''},afade=t=in:d=${fade},afade=t=out:st=${Math.max(0, durOut - fade).toFixed(3)}:d=${fade}[a]`;
   execFileSync('ffmpeg', [
-    '-y', '-v', 'error', '-ss', p.ss.toFixed(3), '-t', p.dur.toFixed(3), '-i', p.arquivo, ...(wm ? ['-i', wm] : []),
+    '-y', '-v', 'error', ...PROBE, '-ss', p.ss.toFixed(3), '-t', p.dur.toFixed(3), '-i', p.arquivo, ...(wm ? ['-i', wm] : []),
     '-filter_complex', `${vf}${wmF};${af}`,
     '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-preset', preset, '-crf', '21', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '160k', '-ac', '2', '-t', durOut.toFixed(3), out,

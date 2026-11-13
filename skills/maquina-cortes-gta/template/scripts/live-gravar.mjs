@@ -11,7 +11,7 @@
 // Saídas: <pasta>/blocos/bloco-000.ts, bloco-001.ts...; <pasta>/gravacao.json ({ativo, ...}).
 // Para parar: crie o arquivo <pasta>/PARAR (ou Ctrl+C). O bloco atual é fechado e a gravação encerra.
 // Se a conexão cair, tenta reconectar sozinho (até 6 vezes seguidas, com 20 s de espera); os blocos continuam a numeração.
-import {spawn} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {readJson, writeJson} from './live-comum.mjs';
@@ -59,11 +59,25 @@ const nextNumber = () => {
   return nums.length ? Math.max(...nums) + 1 : 0;
 };
 
+// Links diretos da live (o YouTube costuma entregar vídeo e áudio separados). Os links expiram em algumas horas;
+// cada reconexão pede links novos.
+function streamUrls() {
+  const r = spawnSync('yt-dlp', ['--no-warnings', '--no-playlist', '-g', '-f', 'bv*[height<=1080]+ba/b[height<=1080]/b', fonte], {encoding: 'utf8'});
+  if (r.status !== 0) {
+    process.stderr.write(r.stderr || '');
+    return [];
+  }
+  return r.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+}
+
 function runOnce() {
   return new Promise((resolve) => {
     const startNumber = nextNumber();
+    const urls = isFile || desdeInicio ? [] : streamUrls();
+    if (!isFile && !desdeInicio && !urls.length) return resolve({code: 1, seconds: 0});
+    const separado = urls.length >= 2; // vídeo e áudio em links diferentes
     const segArgs = [
-      '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy',
+      '-map', '0:v:0', '-map', separado ? '1:a:0' : '0:a:0?', '-c', 'copy',
       '-f', 'segment', '-segment_time', String(blocoSeg), '-segment_format', 'mpegts',
       '-segment_start_number', String(startNumber), '-reset_timestamps', '1',
       path.join(dir, 'bloco-%03d.ts'),
@@ -72,10 +86,14 @@ function runOnce() {
     let ffmpeg;
     if (isFile) {
       ffmpeg = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', fonte, ...segArgs], {stdio: ['pipe', 'inherit', 'inherit']});
+    } else if (!desdeInicio) {
+      // o FFmpeg lê a live direto (HLS) e junta vídeo + áudio sem recodificar
+      const inputs = urls.slice(0, 2).flatMap((u) => ['-i', u]);
+      ffmpeg = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, ...segArgs], {stdio: ['pipe', 'inherit', 'inherit']});
     } else {
       ytdlp = spawn(
         'yt-dlp',
-        ['-f', 'b[height<=1080]/b', '--no-playlist', '--no-part', '--hls-use-mpegts', ...(desdeInicio ? ['--live-from-start'] : []), '-o', '-', fonte],
+        ['-f', 'bv*[height<=1080]+ba/b[height<=1080]/b', '--no-playlist', '--no-part', '--hls-use-mpegts', ...(desdeInicio ? ['--live-from-start'] : []), '-o', '-', fonte],
         {stdio: ['ignore', 'pipe', 'inherit']},
       );
       ffmpeg = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', 'pipe:0', ...segArgs], {stdio: ['pipe', 'inherit', 'inherit']});

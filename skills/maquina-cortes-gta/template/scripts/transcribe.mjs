@@ -30,7 +30,9 @@ fs.writeFileSync(path.join(work, 'meta.json'), JSON.stringify(meta, null, 2));
 
 // áudio 16 kHz mono (formato que o whisper.cpp pede)
 const wav = path.join(work, 'audio16k.wav');
-execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', video, ...(maxSeconds ? ['-t', String(maxSeconds)] : []), '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', wav]);
+// first_pts=0: se o áudio começa depois do vídeo (comum no 1º bloco de uma live do YouTube), completa o começo com
+// silêncio, para os tempos da transcrição baterem com os do vídeo.
+execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', video, ...(maxSeconds ? ['-t', String(maxSeconds)] : []), '-vn', '-af', 'aresample=async=1:first_pts=0', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', wav]);
 
 // silêncios (para cortar as pausas depois)
 const sd = spawnSync('ffmpeg', ['-hide_banner', '-i', wav, '-af', 'silencedetect=noise=-35dB:d=0.45', '-f', 'null', '-'], {encoding: 'utf8'});

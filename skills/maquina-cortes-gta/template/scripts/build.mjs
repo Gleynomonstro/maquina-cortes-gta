@@ -21,7 +21,21 @@ const HOME = path.join(os.homedir(), '.maquina-cortes-gta');
 const ENGINE = path.join(HOME, 'engine');
 const cfg = JSON.parse(fs.readFileSync(path.join(HOME, 'config.json'), 'utf8'));
 const read = (f) => JSON.parse(fs.readFileSync(path.join(work, f), 'utf8'));
-const words = read('captions.json');
+// Tira marcações do whisper que não são fala ("[música]", "[Som de som]", "(risos)"), mesmo quando vêm partidas
+// em várias palavras. Elas apareceriam na legenda como se alguém tivesse falado.
+const words = [];
+{
+  let tag = null;
+  for (const w of read('captions.json')) {
+    const t = w.text.trim();
+    if (!tag && /^[[(]/.test(t)) tag = t[0] === '[' ? ']' : ')';
+    if (tag) {
+      if (t.endsWith(tag)) tag = null;
+      continue;
+    }
+    words.push(w);
+  }
+}
 const silences = read('silences.json');
 const cuts = read('cuts.json');
 const meta = read('meta.json');

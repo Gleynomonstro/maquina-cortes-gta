@@ -55,7 +55,8 @@ function status() {
     ffprobe: !!which('ffprobe'),
     ytdlp: !!which('yt-dlp'),
     // efeitos sonoros (opcional): Python + chave da ElevenLabs; imagens do Google (opcional): chave e id da API
-    python: !!(which('python3') || which('python')),
+    // no Windows, `python` pode ser só o atalho da Microsoft Store (existe, mas não roda): testa de verdade
+    python: ['python3', 'python'].some((p) => which(p) && spawnSync(p, ['--version'], {encoding: 'utf8'}).status === 0),
     elevenlabsKey: !!process.env.ELEVENLABS_API_KEY,
     googleImagens: !!(process.env.GOOGLE_API_KEY && process.env.GOOGLE_CSE_ID),
     efeitosGerados: fs.existsSync(path.join(HOME, 'sfx')) ? fs.readdirSync(path.join(HOME, 'sfx')).filter((f) => /\.(mp3|wav)$/.test(f)).length : 0,

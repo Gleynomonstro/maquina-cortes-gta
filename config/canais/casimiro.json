@@ -1,0 +1,50 @@
+{
+  "$comentario": "Configuração de uma FONTE (o canal de onde vêm os VODs) + a marca do SEU perfil nos cortes. Formato em config/canais/LEIAME.md.",
+  "nome": "Casimiro (Cortes do Casimito)",
+  "idioma": "pt",
+  "licencas": "relaxado",
+  "trilhaJogo": null,
+  "autorizacao": {
+    "registrada": false,
+    "detalhes": "PENDENTE: registre aqui a permissão do canal para usar os VODs (link, print ou e-mail e a data)."
+  },
+  "cameras": [
+    {
+      "nome": "casimiro",
+      "rect": {
+        "x": 1522,
+        "y": 32,
+        "w": 366,
+        "h": 214
+      },
+      "rosto": {
+        "x": 0.51,
+        "y": 0.55
+      },
+      "boca": {
+        "x": 0.51,
+        "y": 0.75,
+        "w": 0.3,
+        "h": 0.18
+      }
+    }
+  ],
+  "marca": {
+    "perfil": "@capivaracity.vi",
+    "logo": "~/.maquina-cortes-gta/logo.png",
+    "posicao": "superior-direito"
+  },
+  "cores": {
+    "palavraAtiva": "#FFD400",
+    "secundaria": "#9DB4D0",
+    "gancho": "#FFD400",
+    "cartao": [
+      "#2B0A4A",
+      "#C2185B"
+    ]
+  },
+  "midiaPropria": null,
+  "sfx": "~/.maquina-cortes-gta/sfx",
+  "musica": null,
+  "rockstarAprovadas": []
+}

@@ -11,6 +11,8 @@ Escreva pouco no chat: nunca despeje a transcrição nem JSON inteiro; mostre s�
 
 `<skill>` = a pasta onde este SKILL.md está. `~/.maquina-cortes-gta` = pasta de dados do usuário (motor, whisper, nome do perfil e logo).
 
+**Corte vertical da fase 1 (padrão novo):** streamer centralizado em tela cheia, gancho, ritmo de 2 a 3 s, inserts, legenda bilíngue, −14 LUFS, metadados e checagem. Siga `references/vertical.md` e as skills do projeto em `.claude/skills/`. O layout metade/metade abaixo continua disponível só se o usuário pedir.
+
 **Live acontecendo agora?** Se o usuário mandar o link de uma live em andamento ou pedir cortes "da live enquanto ela rola", faça os passos 0 e 1 abaixo e siga `references/ao-vivo.md` (grava em blocos e gera vídeos longos de missões e exploração para o YouTube, e curtos para Shorts, Reels e TikTok).
 
 ## 0. Conferir a instalação

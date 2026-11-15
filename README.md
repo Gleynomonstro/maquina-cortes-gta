@@ -48,6 +48,18 @@ O visual é o de "metade streamer, metade vídeo": a pessoa em cima, gameplay ou
 
 Cada corte sai em MP4 1080×1920, 30 fps.
 
+## Corte vertical (fase 1)
+
+O formato novo: **o streamer centralizado em tela cheia**, gancho em texto grande nos primeiros 1,5 s, mudança visual a cada 2 a 3 s (zoom, corte, insert, destaque), pausas acima de 0,2 s removidas, legenda principal palavra por palavra e legenda secundária para as falas do jogo/trailer traduzidas, B-roll licenciado com registro de fontes, áudio a −14 LUFS e uma checagem final que reprova o corte se algo sair do padrão.
+
+- Configuração por canal: [`config/canais/`](config/canais/LEIAME.md).
+- Fluxo e formato do `cortes.json`: [`references/vertical.md`](skills/maquina-cortes-gta/references/vertical.md).
+- Skills do projeto: [`.claude/skills/`](.claude/skills) (detecção de momentos, legenda bilíngue, resenha-ptbr, B-roll licenciado, efeitos sonoros, metadados).
+
+```bash
+node ~/.maquina-cortes-gta/engine/scripts/vertical.mjs work config/canais/<canal>.json saida
+```
+
 ## Modo ao vivo (live acontecendo agora)
 
 > /maquina-cortes-gta faz cortes dessa live enquanto ela rola: https://www.twitch.tv/STREAMER

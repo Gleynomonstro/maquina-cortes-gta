@@ -10,6 +10,7 @@ Um arquivo por canal de origem: `config/canais/<nome>.json`. Ele diz **de onde v
 | `trilhaJogo` | não | Caminho de um arquivo só com o áudio do jogo, se o streamer gravar separado. Com ele, a legenda secundária (falas do jogo) fica exata. `null` se não houver. |
 | `autorizacao.registrada` | sim | `true` só quando houver permissão do canal registrada em `detalhes`. Com `false`, o metadado de cada corte sai marcado como **autorização pendente**. |
 | `cameras` | sim* | Uma entrada por pessoa que fala. `rect` = retângulo da câmera em **pixels do vídeo de origem**; `rosto` = centro do rosto dentro do retângulo (0 a 1); `boca` = região da boca dentro do retângulo (0 a 1), usada para saber quem fala quando há duas ou mais câmeras. *Sem câmeras configuradas, seria preciso rastrear o rosto (precisa do Python + MediaPipe, ainda não instalado). |
+| `jogo` | não | Retângulo (pixels da origem) da área do jogo/trailer **sem a câmera e sem a barra do player**. Habilita a **tela dividida** (streamer em cima, jogo embaixo, sincronizado). Sem ele, o corte usa só o streamer sozinho. |
 | `marca.perfil` | sim | Nome na marca d'água (ex.: `@capivaracity.vi`). |
 | `marca.logo` | sim | Caminho da logo (aceita `~`). |
 | `marca.posicao` | sim | `superior-direito`, `superior-esquerdo`, `inferior-direito` ou `inferior-esquerdo`. |

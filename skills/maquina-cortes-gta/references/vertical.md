@@ -1,6 +1,6 @@
 # Corte vertical (fase 1)
 
-Um corte de **até 60 s (ideal 30 a 45)**, 1080×1920, 30 fps, H.264, AAC 48 kHz a −14 LUFS, com o **streamer centralizado em tela cheia**, gancho nos primeiros 1,5 s e mudança visual a cada 2 a 3 s. Junto saem um JSON de metadados (com o registro de fontes) e um relatório de checagem.
+Um corte de **até 60 s (ideal 30 a 45)**, 1080×1920, 30 fps, H.264, AAC 48 kHz a −14 LUFS, em **tela dividida** (o streamer em cima, centralizado na metade, e o que ele está vendo embaixo, sincronizado) quando a configuração tem a área `jogo`, ou com o streamer centralizado em tela cheia quando não tem. Gancho nos primeiros 1,5 s, mudança visual a cada 2 a 3 s e **inserts em tela cheia mostrando o que ele cita**. Junto saem um JSON de metadados (com o registro de fontes) e um relatório de checagem.
 
 `E` = `~/.maquina-cortes-gta/engine/scripts`. Skills do projeto em `.claude/skills/` (detecção de momentos, legenda bilíngue, resenha-ptbr, B-roll, efeitos sonoros, metadados).
 
@@ -35,8 +35,7 @@ Tempos em **segundos do vídeo de origem** (os mesmos do `transcript-text.mjs`).
       "gancho": "TIROTEIO E ELAS NEM LIGAM",
       "secundarias": [{"inicio": 294.4, "fim": 296.8, "texto": "Raymond, que porra é essa?", "rotulo": "TRAILER"}],
       "inserts": [
-        {"tipo": "origem", "inicio": 1440.0, "fim": 1442.6},
-        {"tipo": "cartao", "inicio": 1450.6, "fim": 1451.5, "texto": "INJOGÁVEL", "subtexto": "segundo o Casimiro"},
+        {"tipo": "broll", "inicio": 1440.0, "fim": 1442.4, "busca": "assault rifle firing slow motion"},
         {"tipo": "broll", "inicio": 1451.6, "fim": 1454.4, "busca": "Rio de Janeiro skyline", "modo": "cheio"}
       ],
       "destaques": [{"inicio": 1437.6, "texto": "JOGO MAL FEITO?"}],
@@ -54,10 +53,23 @@ Tempos em **segundos do vídeo de origem** (os mesmos do `transcript-text.mjs`).
 | Campo | Regra |
 |---|---|
 | `gancho` | Frase curta (até ~6 palavras), caixa alta, aparece nos primeiros 1,5 s com zoom. |
-| `inserts[].tipo` | `origem` (o gameplay/trailer do próprio VOD, coberto pela autorização do VOD), `broll` (busca online, ver skill), `cartao` (texto grande animado), ou `arquivo` + `licenca` para um arquivo seu. |
-| `inserts[].modo` | `cheio` (tela toda, 2 a 3 s) ou `pip` (pequeno no alto, 2 a 4 s, o streamer continua). |
+| `inserts[].tipo` | `zoom` (aproxima numa região do que está na tela, `rect` em pixels da origem), `replay` (repete sem som um momento anterior: `de` = segundo da origem onde começa, `rect` opcional), `broll` (busca online, ver skill), `arquivo` (+ `licenca`), ou `origem`. `cartao` existe, mas **não use**. |
+| `inserts[].modo` | `baixo` (só a metade de baixo; padrão de `zoom`/`replay`, o streamer continua em cima), `cheio` (tela toda; padrão de `broll`, 2 a 3 s) ou `pip`. |
 | `inserts[]` | Sempre sobre um trecho com fala relacionada. Insert sem fala embaixo é ignorado. |
 | `destaques` | Texto de impacto que pula na tela por 1,2 s (conta como mudança visual). |
+| `solos` | Trechos (`inicio`/`fim`) com o streamer **sozinho** em tela cheia. Use pouco: o padrão (e o preferido) é a tela dividida o tempo todo, mesmo com o vídeo de baixo pausado. `"layout": "solo"` usa só o streamer. |
+
+**Layout (preferência do usuário, 15/11/2026):** tela dividida como base, o tempo todo; ficar muito tempo só com o streamer "fica vazio". A dinâmica vem dos **inserts por cima das duas metades** e dos cortes com zoom. Na tela dividida a legenda fica na divisa (y = 960) e a secundária logo abaixo.
+
+**Quando pôr insert (feedback de 15/11/2026):** só para **preencher vazio**: imagem de baixo parada (`node E/trechos-parados.mjs work config/canais/<canal>.json INICIO FIM` mostra onde) ou o streamer falando de algo que não está na tela. Se está acontecendo alguma coisa embaixo, deixe a tela dividida rolar. Prefira o **próprio vídeo** a clipe genérico: o streamer fala da mulher atirando → `zoom` na mulher, ou `replay` do momento em que ela atirou. Clipe de fora só quando ele cita algo que não é do jogo e que combina de verdade (FIFA, Rio); nada de associação literal fraca ("videogame" → controle de Xbox).
+
+**Transições:** todo insert entra e sai com o mesmo fade curto (0,2 s). Dois inserts colados viram fusão (o de baixo fica até o de cima terminar de aparecer).
+
+**Layout por vídeo:** a câmera e a área do jogo mudam de VOD para VOD; ponha `"layoutOrigem": {"cameras": [...], "jogo": {...}}` no `cortes.json` para sobrescrever a configuração do canal.
+
+**Sem cartões gráficos:** não use `tipo: "cartao"` (texto animado sobre fundo colorido); o usuário achou "nada a ver". Se não houver clipe ou imagem do assunto, o insert é descartado.
+
+**Referência fora do GTA = insert:** quando o streamer cita algo que não é do GTA (outro jogo, cidade, país, marca, pessoa, filme), cubra a fala com um `broll` desse assunto (ex.: "É tipo FIFA?" → gameplay de FIFA; "o Rio não é assim" → Rio de Janeiro; "coisa de americano" → bandeira dos EUA).
 | `secundarias` | Falas do jogo/trailer **traduzidas**; os trechos saem da legenda principal. |
 
 ## O que o `vertical.mjs` garante

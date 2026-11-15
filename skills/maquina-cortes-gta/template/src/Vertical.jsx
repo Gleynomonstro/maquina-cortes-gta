@@ -45,6 +45,23 @@ const Shot = ({shot, sourceFile, srcW, srcH, startFrame, frames}) => {
   const video = (style, muted) => (
     <OffthreadVideo src={staticFile(sourceFile)} startFrom={startFrame} endAt={startFrame + frames} muted={muted} style={style} />
   );
+  if (shot.layout === 'dividido') {
+    // tela dividida (react): o streamer em cima, o que ele está vendo embaixo, no mesmo instante
+    const half = H / 2;
+    const st = shot.top;
+    const sb = shot.bottom;
+    const s = st.escala * z;
+    return (
+      <AbsoluteFill style={{background: '#000'}}>
+        <div style={{position: 'absolute', left: 0, top: 0, width: W, height: half, overflow: 'hidden'}}>
+          {video(placeVideo(0, 0, s, fx, fy, st.faceOut.x, st.faceOut.y, srcW, srcH), false)}
+        </div>
+        <div style={{position: 'absolute', left: 0, top: half, width: W, height: half, overflow: 'hidden'}}>
+          {video(placeVideo(0, 0, sb.escala, sb.cx, sb.cy, W / 2, half / 2, srcW, srcH), true)}
+        </div>
+      </AbsoluteFill>
+    );
+  }
   if (shot.modo === 'cheio') {
     const s = shot.escala * z;
     return <AbsoluteFill style={{overflow: 'hidden', background: '#000'}}>{video(placeVideo(0, 0, s, fx, fy, faceOut.x, faceOut.y, srcW, srcH), false)}</AbsoluteFill>;
@@ -116,10 +133,47 @@ const Card = ({texto, subtexto, cores, frames}) => {
   );
 };
 
-const Insert = ({ins, cores}) => {
+// Insert do PRÓPRIO jogo (sem som): `zoom` (aproxima numa região do que está na tela agora) ou `replay` (mostra de
+// novo um momento anterior). Ocupa só a metade de baixo (modo "baixo", o streamer continua em cima) ou a tela toda.
+const JogoInsert = ({ins, sourceFile, srcW, srcH, frames}) => {
+  const frame = useCurrentFrame();
+  const area = ins.modo === 'cheio' ? {top: 0, height: H} : {top: H / 2, height: H / 2};
+  const r = ins.rect;
+  // empurra o zoom devagar durante o insert (movimento contínuo, sem plano parado)
+  const z = interpolate(frame, [0, frames], [ins.zoomDe || 1, ins.zoomAte || 1.12]);
+  const s = Math.max(W / r.w, area.height / r.h) * z;
+  const cx = r.x + r.w / 2;
+  const cy = r.y + r.h / 2;
+  return (
+    <div style={{position: 'absolute', left: 0, top: area.top, width: W, height: area.height, overflow: 'hidden', background: '#000'}}>
+      <OffthreadVideo
+        src={staticFile(sourceFile)}
+        startFrom={Math.round(ins.startIn * 30)}
+        muted
+        style={{position: 'absolute', width: srcW * s, height: srcH * s, left: W / 2 - cx * s, top: area.height / 2 - cy * s, objectFit: 'fill'}}
+      />
+    </div>
+  );
+};
+
+const Insert = ({ins, cores, sourceFile, srcW, srcH}) => {
   const frames = Math.max(1, Math.round(ins.dur * 30));
   const frame = useCurrentFrame();
-  const enter = interpolate(frame, [0, 5], [0, 1], {extrapolateRight: 'clamp'});
+  // entra e sai do mesmo jeito (fade curto nos dois lados); entre dois inserts colados, o script zera um dos lados
+  // e o outro faz a fusão por cima
+  const fi = ins.fadeIn ?? 6;
+  const fo = ins.fadeOut ?? 6;
+  const enter = Math.min(
+    fi ? interpolate(frame, [0, fi], [0, 1], {extrapolateRight: 'clamp'}) : 1,
+    fo ? interpolate(frame, [frames - fo, frames], [1, 0], {extrapolateLeft: 'clamp'}) : 1,
+  );
+  if (ins.tipo === 'jogo') {
+    return (
+      <AbsoluteFill style={{opacity: enter}}>
+        <JogoInsert ins={ins} sourceFile={sourceFile} srcW={srcW} srcH={srcH} frames={frames} />
+      </AbsoluteFill>
+    );
+  }
   if (ins.modo === 'pip') {
     return (
       <div style={{position: 'absolute', left: 48, top: 420, width: 470, height: 264, borderRadius: 22, overflow: 'hidden', border: '5px solid #fff', boxShadow: '0 12px 40px rgba(0,0,0,0.6)', transform: `scale(${0.8 + 0.2 * enter})`, opacity: enter, transformOrigin: 'top left'}}>
@@ -192,11 +246,15 @@ const Destaque = ({texto, frames}) => {
 };
 
 // legenda principal: fala do streamer, palavra por palavra, palavra falada em cor de destaque (faixa do meio)
-const Captions = ({pages, cor, top}) => {
+// a posição da legenda acompanha o layout do plano atual (na tela dividida ela fica na divisa)
+const topAt = (faixas, ms, padrao) => (faixas.find((f) => ms >= f.startMs && ms < f.endMs) || {})[padrao] ?? null;
+
+const Captions = ({pages, cor, faixas}) => {
   const frame = useCurrentFrame();
   const ms = (frame / 30) * 1000;
   const page = pages.find((p) => ms >= p.startMs && ms < p.endMs);
   if (!page) return null;
+  const top = topAt(faixas, ms, 'legenda') ?? 1300;
   return (
     <div style={{position: 'absolute', left: 50, width: W - 100, top, transform: 'translateY(-50%)', textAlign: 'center', fontFamily, fontWeight: 900, fontSize: 88, lineHeight: 1.05, textTransform: 'uppercase', color: '#fff', WebkitTextStroke: '11px #000', paintOrder: 'stroke fill', textShadow: '0 7px 0 rgba(0,0,0,0.35)'}}>
       {page.words.map((w, i) => (
@@ -209,11 +267,12 @@ const Captions = ({pages, cor, top}) => {
 };
 
 // legenda secundária: fala do jogo/trailer traduzida, menor, em itálico, cor fria, com rótulo
-const Secondary = ({items, cor, top}) => {
+const Secondary = ({items, cor, faixas}) => {
   const frame = useCurrentFrame();
   const ms = (frame / 30) * 1000;
   const it = items.find((p) => ms >= p.startMs && ms < p.endMs);
   if (!it) return null;
+  const top = topAt(faixas, ms, 'secundaria') ?? 1450;
   return (
     <div style={{position: 'absolute', left: 70, right: 70, top, textAlign: 'center'}}>
       <span style={{display: 'inline-block', fontFamily, fontWeight: 800, fontSize: 24, letterSpacing: 2, color: '#0b1520', background: cor, borderRadius: 8, padding: '4px 12px', marginRight: 14, verticalAlign: 'middle'}}>
@@ -255,11 +314,11 @@ export const Vertical = (p) => {
       })}
       {p.inserts.map((ins, i) => (
         <Sequence key={`i${i}`} from={Math.round(ins.at * 30)} durationInFrames={Math.max(1, Math.round(ins.dur * 30))}>
-          <Insert ins={ins} cores={p.cores.cartao} />
+          <Insert ins={ins} cores={p.cores.cartao} sourceFile={p.sourceFile} srcW={p.sourceWidth} srcH={p.sourceHeight} />
         </Sequence>
       ))}
-      <Captions pages={p.pages} cor={p.cores.palavraAtiva} top={p.layout.legendaTop} />
-      <Secondary items={p.secundarias} cor={p.cores.secundaria} top={p.layout.secundariaTop} />
+      <Captions pages={p.pages} cor={p.cores.palavraAtiva} faixas={p.faixas || []} />
+      <Secondary items={p.secundarias} cor={p.cores.secundaria} faixas={p.faixas || []} />
       {p.destaques.map((d, i) => (
         <Sequence key={`d${i}`} from={Math.round(d.at * 30)} durationInFrames={Math.round(d.dur * 30)}>
           <Destaque texto={d.texto} frames={Math.round(d.dur * 30)} />

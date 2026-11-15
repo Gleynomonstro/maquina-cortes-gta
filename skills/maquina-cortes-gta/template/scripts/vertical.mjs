@@ -41,8 +41,10 @@ const hms = (s) => {
   return `${h ? h + ':' : ''}${String(m).padStart(2, '0')}:${ss}`;
 };
 
-const canal = readJson(canalFile);
 const cortes = read('cortes.json');
+// a posição da câmera e da área do jogo muda de vídeo para vídeo: `layoutOrigem` no cortes.json sobrescreve a do canal
+const canalBase = {...readJson(canalFile), ...(cortes.layoutOrigem || {})};
+let canal = canalBase; // cada corte pode ter o próprio `layoutOrigem` (o layout muda no meio do VOD)
 const meta = read('meta.json');
 const silences = read('silences.json');
 // "licencas": "relaxado" (decisão do usuário): aceita material sem licença verificada (YouTube, qualquer licença do
@@ -221,6 +223,28 @@ function camGeom(cam) {
   return {modo: 'desfocado', escala, faceOut: {x: W / 2, y: top + ry * h}, caixa: {top, height: h}, cam: {...rect, rostoX: rx, rostoY: ry}, ampliacao: escala};
 }
 
+// tela dividida (react): em cima a câmera do streamer preenchendo a metade (rosto centralizado nela), embaixo a área
+// do jogo/trailer (`jogo` na configuração), sincronizada com a fala
+function splitGeom(cam, jogo) {
+  const half = H / 2;
+  const rx = cam.rosto?.x ?? 0.5;
+  const ry = cam.rosto?.y ?? 0.42;
+  const r = cam.rect;
+  const s = Math.max(W / r.w, half / r.h);
+  const fx = r.x + r.w * rx;
+  const fy = r.y + r.h * ry;
+  const left = Math.min(Math.max(fx - W / 2 / s, r.x), r.x + r.w - W / s);
+  const top = Math.min(Math.max(fy - (half * 0.45) / s, r.y), r.y + r.h - half / s);
+  const sb = Math.max(W / jogo.w, half / jogo.h);
+  return {
+    layout: 'dividido',
+    top: {escala: s, faceOut: {x: (fx - left) * s, y: (fy - top) * s}},
+    bottom: {escala: sb, cx: jogo.x + jogo.w / 2, cy: jogo.y + jogo.h / 2},
+    cam: {...r, rostoX: rx, rostoY: ry},
+    ampliacao: s,
+  };
+}
+
 function makePages(list) {
   const pages = [];
   let cur = [];
@@ -250,6 +274,7 @@ const emojis = (s) => (String(s).match(/\p{Extended_Pictographic}/gu) || []).len
 
 // ---------------------------------------------------------------- um corte
 async function buildClip(clip) {
+  canal = {...canalBase, ...(clip.layoutOrigem || {})};
   const id = clip.id;
   const falhas = [];
   const avisos = [];
@@ -307,11 +332,23 @@ async function buildClip(clip) {
       shots.push({from: c, to: s.to});
     }
     let out = 0;
+    // layout de cada plano: "dividido" (streamer em cima, o que ele vê embaixo, sincronizado) é o PADRÃO sempre que
+    // a configuração tem a área `jogo` (preferência do usuário, 15/11/2026: fica menos vazio, mesmo com o vídeo
+    // pausado). `solos` no corte marca trechos com o streamer sozinho em tela cheia; `layout: "solo"` usa só ele;
+    // `divididos` (formato antigo) ainda é aceito.
+    const dividido = (sh) => {
+      if (!canal.jogo || clip.layout === 'solo') return false;
+      const mid = (sh.from + sh.to) / 2;
+      if (clip.solos) return !clip.solos.some((r) => mid >= r.inicio && mid < r.fim);
+      if (clip.divididos) return clip.divididos.some((r) => mid >= r.inicio && mid < r.fim);
+      return true;
+    };
     return shots.map((sh, i) => {
       const k = quem((sh.from + sh.to) / 2);
-      const g = geoms[k];
-      // zoom alterna a cada plano (no modo desfocado nunca abaixo de 1,06, para a moldura da câmera não aparecer)
-      const base = g.modo === 'desfocado' ? 1.06 : 1.0;
+      const div = dividido(sh);
+      const g = div ? splitGeom(cams[k], canal.jogo) : {...geoms[k], layout: 'solo'};
+      // zoom alterna a cada plano (nunca abaixo de 1,04-1,06 quando a moldura da câmera poderia aparecer)
+      const base = div ? 1.04 : g.modo === 'desfocado' ? 1.06 : 1.0;
       const r = {...sh, ...g, camIndex: k, zoom: i === 0 ? base + 0.08 : i % 2 ? base : base + 0.1, outStart: out};
       out += Math.max(1, Math.round((sh.to - sh.from) * FPS)) / FPS;
       return r;
@@ -356,27 +393,54 @@ async function buildClip(clip) {
           ins._r = {tipo: 'cartao'};
           continue;
         }
+        // zoom (aproxima numa região do que está na tela agora) e replay (repete, sem som, um momento anterior):
+        // material do próprio VOD, sem busca
+        if (ins.tipo === 'zoom' || ins.tipo === 'replay') {
+          const rect = ins.rect || canal.jogo || {x: 0, y: 0, w: meta.width, h: meta.height};
+          if (ins.tipo === 'replay' && typeof ins.de !== 'number') {
+            avisos.push(`insert ${k} (replay) sem "de" (segundo da origem onde começa o replay): removido.`);
+            ins._skip = true;
+            continue;
+          }
+          ins._r = {tipo: 'jogo', rect, startIn: ins.tipo === 'replay' ? ins.de : ins.inicio, zoomDe: ins.tipo === 'zoom' ? 1.0 : 1.0, zoomAte: ins.tipo === 'zoom' ? 1.15 : 1.08,
+            fonte: {tipo: 'origem', fonte: `VOD de origem (${ins.tipo})`, url: cortes.origem?.url || null, autor: canal.nome, licenca: canal.autorizacao?.registrada ? 'autorização do canal registrada' : 'AUTORIZAÇÃO PENDENTE', licencaUrl: null}};
+          continue;
+        }
         if (ins.tipo === 'origem') {
           ins._r = {tipo: 'video', file: 'source.mp4', startIn: ins.inicio, fonte: {tipo: 'origem', fonte: 'VOD de origem', url: cortes.origem?.url || null, autor: canal.nome, licenca: canal.autorizacao?.registrada ? 'autorização do canal registrada' : 'AUTORIZAÇÃO PENDENTE', licencaUrl: null}};
           continue;
         }
         if (ins.arquivo) {
           if (!ins.licenca && !relaxado) {
-            avisos.push(`insert ${k}: arquivo ${ins.arquivo} sem licença informada; trocado por cartão.`);
-            ins._r = {tipo: 'cartao'};
+            avisos.push(`insert ${k}: arquivo ${ins.arquivo} sem licença informada; removido.`);
+            ins._skip = true;
             continue;
           }
           const ext = path.extname(ins.arquivo);
           ins._r = {tipo: /\.(mp4|mov|webm)$/i.test(ext) ? 'video' : 'imagem', file: pub(ins.arquivo, `ins-${id}-${k}${ext}`), fonte: {fonte: ins.fonte || 'arquivo', url: ins.url || null, autor: ins.autor || null, licenca: ins.licenca || 'NÃO VERIFICADA (modo relaxado)', licencaUrl: ins.licencaUrl || null, verificada: !!ins.licenca}};
           continue;
         }
-        const {resultado, tentativas} = await buscarBroll(canal, ins.busca || ins.texto || '', path.join(work, 'broll'), `${id}-${k}`);
+        // cache: o mesmo insert (mesma busca/vídeo/trecho) reaproveita o arquivo já escolhido; a busca do YouTube muda
+        // de uma vez para outra e um insert bom poderia piorar ao renderizar de novo
+        const cacheF = path.join(work, 'broll', 'cache.json');
+        const cache = fs.existsSync(cacheF) ? readJson(cacheF) : {};
+        const chave = JSON.stringify([ins.busca || ins.texto || '', ins.youtube || null, ins.trecho ?? null]);
+        let resultado = cache[chave] && fs.existsSync(cache[chave].arquivo) ? cache[chave] : null;
+        let tentativas = [];
+        if (!resultado) {
+          ({resultado, tentativas} = await buscarBroll(canal, ins.busca || ins.texto || '', path.join(work, 'broll'), `${id}-${k}`, {trecho: ins.trecho, youtube: ins.youtube}));
+          if (resultado) {
+            cache[chave] = resultado;
+            fs.mkdirSync(path.dirname(cacheF), {recursive: true});
+            fs.writeFileSync(cacheF, JSON.stringify(cache, null, 1));
+          }
+        }
         if (resultado) {
           const ext = path.extname(resultado.arquivo);
           ins._r = {tipo: resultado.tipo, file: pub(resultado.arquivo, `ins-${id}-${k}${ext}`), fonte: resultado};
         } else {
-          avisos.push(`insert ${k} ("${ins.busca}"): sem B-roll licenciado (${tentativas.join('; ')}); virou cartão de texto.`);
-          ins._r = {tipo: 'cartao'};
+          avisos.push(`insert ${k} ("${ins.busca}"): sem B-roll licenciado (${tentativas.join('; ')}); insert removido (sem cartão gráfico no lugar).`);
+          ins._skip = true;
         }
       }
     }
@@ -386,8 +450,10 @@ async function buildClip(clip) {
       // começa no começo da palavra mais próxima (sincronizado com a fala)
       const w0 = words.map((w) => w.startMs / 1000).sort((x, y) => Math.abs(x - ins.inicio) - Math.abs(y - ins.inicio))[0];
       const at = toOut(Math.abs(w0 - ins.inicio) < 0.5 ? w0 : ins.inicio);
-      const modo = ins.modo === 'pip' ? 'pip' : 'cheio';
-      const dur = Math.min(Math.max(toOut(ins.fim) - at, 2), modo === 'pip' ? 4 : 3, total - at);
+      const r0 = ins._r;
+      // zoom/replay ficam na metade de baixo por padrão (o streamer continua em cima)
+      const modo = ins.modo === 'pip' ? 'pip' : ins.modo === 'cheio' ? 'cheio' : r0.tipo === 'jogo' || ins.modo === 'baixo' ? 'baixo' : 'cheio';
+      const dur = Math.min(Math.max(toOut(ins.fim) - at, 2), modo === 'cheio' ? 3 : 4, total - at);
       if (dur < 1) continue;
       const r = ins._r;
       inserts.push({
@@ -395,6 +461,7 @@ async function buildClip(clip) {
         texto: (ins.texto || ins.busca || '').toUpperCase(), subtexto: ins.subtexto ? ins.subtexto.toUpperCase() : null,
         // crédito na tela só para licença verificada (ex.: CC BY exige); o não verificado fica só no registro de fontes
         credito: r.fonte && r.fonte.autor && r.fonte.tipo !== 'origem' && r.fonte.verificada !== false ? `${r.fonte.autor} · ${r.fonte.licenca}` : null,
+        rect: r.rect, zoomDe: r.zoomDe, zoomAte: r.zoomAte, fadeIn: 6, fadeOut: 6,
         _fonte: r.fonte, _src: [ins.inicio, ins.fim], _fala: ins._fala,
       });
     }
@@ -414,6 +481,17 @@ async function buildClip(clip) {
       }
     }
     for (let i = inserts.length - 1; i >= 0; i--) if (inserts[i].dur < 1) inserts.splice(i, 1);
+    // transições: cada insert entra e sai com o mesmo fade curto. Dois inserts colados (menos de 0,25 s entre eles)
+    // viram uma FUSÃO: o anterior fica inteiro por baixo até o próximo terminar de aparecer por cima (nada de "sai um,
+    // entra o outro" no mesmo instante).
+    for (let i = 1; i < inserts.length; i++) {
+      const p = inserts[i - 1];
+      const c = inserts[i];
+      if (c.at - (p.at + p.dur) < 0.25 && (p.modo === c.modo || c.modo === 'cheio')) {
+        p.dur = c.at - p.at + 0.2;
+        p.fadeOut = 0;
+      }
+    }
     const destaques = (clip.destaques || []).map((d) => ({texto: d.texto.toUpperCase(), at: toOut(d.inicio), dur: 1.2}));
     const hook = {texto: clip.gancho || '', dur: Math.min(2.2, Math.max(1.5, clip.ganchoDuracao || 1.6))};
 
@@ -457,9 +535,17 @@ async function buildClip(clip) {
     }
     const brollT = inserts.filter((i) => i.tipo !== 'cartao' && i.modo === 'cheio').reduce((t, i) => t + i.dur, 0);
     const solo = new Set(shots.map((s) => s.camIndex)).size === 1;
-    const centro = shots.map((s) => ({dx: Math.abs(s.faceOut.x - W / 2), y: s.faceOut.y}));
-    const legTop = LEG_TOP[shots[0].modo];
+    const soloShots = shots.filter((s) => s.layout === 'solo');
+    const centro = (soloShots.length ? soloShots : shots.map((s) => ({faceOut: {x: W / 2, y: 820}}))).map((s) => ({dx: Math.abs(s.faceOut.x - W / 2), y: s.faceOut.y}));
+    const legTop = LEG_TOP[geoms[0].modo];
     const secTop = legTop + 150;
+    const faixas = shots.map((s) => {
+      const d = Math.max(1, Math.round((s.to - s.from) * FPS)) / FPS;
+      return s.layout === 'dividido'
+        ? {startMs: Math.round(s.outStart * 1000), endMs: Math.round((s.outStart + d) * 1000), legenda: H / 2, secundaria: H / 2 + 150}
+        : {startMs: Math.round(s.outStart * 1000), endMs: Math.round((s.outStart + d) * 1000), legenda: legTop, secundaria: secTop};
+    });
+    const tops = faixas.flatMap((f) => [f.legenda, f.secundaria]);
     checks = {
       duracao: total,
       pausasRemovidas: pausas,
@@ -469,7 +555,8 @@ async function buildClip(clip) {
       brollPercentual: Number(((brollT / total) * 100).toFixed(1)),
       segundosSemLegenda: semLegenda,
       centralizado: {solo, maxDesvioX: Number(Math.max(...centro.map((c) => c.dx)).toFixed(1)), rostoYMin: Math.round(Math.min(...centro.map((c) => c.y))), rostoYMax: Math.round(Math.max(...centro.map((c) => c.y)))},
-      legendaNaFaixaSegura: legTop - 70 >= H * 0.2 && secTop + 40 <= H * 0.8,
+      legendaNaFaixaSegura: Math.min(...tops) - 70 >= H * 0.2 && Math.max(...tops) + 40 <= H * 0.8,
+      layouts: {sozinho: soloShots.length, dividido: shots.length - soloShots.length},
       sincronia: {
         palavrasMedidas: sync.errs.length,
         corrigidas: sync.corrigidas,
@@ -482,7 +569,8 @@ async function buildClip(clip) {
     };
     props = {
       totalSeconds: total, sourceFile: 'source.mp4', sourceWidth: meta.width, sourceHeight: meta.height,
-      shots: shots.map((s) => ({from: s.from, to: s.to, modo: s.modo, escala: s.escala, zoom: s.zoom, faceOut: s.faceOut, caixa: s.caixa, cam: s.cam})),
+      shots: shots.map((s) => ({from: s.from, to: s.to, layout: s.layout, modo: s.modo, escala: s.escala, zoom: s.zoom, faceOut: s.faceOut, caixa: s.caixa, cam: s.cam, top: s.top, bottom: s.bottom})),
+      faixas,
       inserts: inserts.map(({_fonte, _src, _fala, ...i}) => i),
       pages, secundarias, destaques, hook, sfx, cores,
       layout: {legendaTop: legTop, secundariaTop: secTop},

@@ -111,18 +111,41 @@ async function wikimedia(query, destDir, id, qualquerLicenca = false) {
 
 // MODO RELAXADO (config "licencas": "relaxado", decisão do usuário): busca no YouTube um trecho curto do vídeo mais
 // relevante (ex.: trailer do GTA 6). A licença NÃO é verificada; a origem fica registrada para revisão futura.
-async function youtube(query, destDir, id) {
+// Qual trecho do vídeo usar: `trecho` (segundo escolhido à mão) > pico do "mais reproduzido" do YouTube (heatmap,
+// o momento que as pessoas mais reveem, normalmente o melhor) > 30% do vídeo.
+function escolherTrecho(url, dur, trecho) {
+  if (typeof trecho === 'number') return {ini: trecho, como: 'escolhido'};
+  const h = spawnSync('yt-dlp', ['--no-warnings', '--print', '%(heatmap)j', url], {encoding: 'utf8'});
+  try {
+    const hm = JSON.parse((h.stdout || '').trim());
+    const ok = (hm || []).filter((p) => p.start_time >= Math.min(5, dur * 0.05) && p.end_time <= dur - 4);
+    if (ok.length) {
+      const top = ok.reduce((a, b) => (b.value > a.value ? b : a));
+      return {ini: Math.floor(top.start_time), como: 'mais reproduzido'};
+    }
+  } catch {}
+  return {ini: Math.max(5, Math.floor(dur * 0.3)), como: '30% do vídeo'};
+}
+// brilho médio (0-255): trecho escuro demais (tela preta, transição) não serve
+function brilho(file) {
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-i', file, '-vf', 'scale=160:-2,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-', '-an', '-f', 'null', '-'], {encoding: 'utf8', maxBuffer: 1 << 24});
+  const v = [...(r.stdout || '').matchAll(/YAVG=([0-9.]+)/g)].map((m) => Number(m[1]));
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+}
+async function youtube(query, destDir, id, opts = {}) {
   fs.mkdirSync(destDir, {recursive: true});
-  const info = spawnSync('yt-dlp', ['--no-warnings', '--no-playlist', '--print', '%(id)s\t%(duration)s\t%(channel)s\t%(webpage_url)s\t%(title)s', `ytsearch5:${query}`], {encoding: 'utf8'});
+  // `youtube` no insert fixa um vídeo específico (já conferido); senão, busca
+  const alvo = opts.youtube || `ytsearch5:${query}`;
+  const info = spawnSync('yt-dlp', ['--no-warnings', '--no-playlist', '--print', '%(id)s\t%(duration)s\t%(channel)s\t%(webpage_url)s\t%(title)s', alvo], {encoding: 'utf8'});
   const cands = (info.stdout || '').trim().split(/\r?\n/).map((l) => l.split('\t')).filter((c) => Number(c[1]) >= 20);
   for (const [vid, dur, canal, url, titulo] of cands) {
-    // pula a abertura: pega 4 s a partir de ~30% do vídeo
-    const ini = Math.max(5, Math.floor(Number(dur) * 0.3));
+    const {ini, como} = escolherTrecho(url, Number(dur), opts.trecho);
     const dest = path.join(destDir, `${id}-youtube-${vid}.mp4`);
+    fs.rmSync(dest, {force: true});
     const r = spawnSync('yt-dlp', ['--no-warnings', '-q', '-f', 'bv*[height<=1080][ext=mp4]/bv*[height<=1080]/b', '--download-sections', `*${ini}-${ini + 4}`, '--force-keyframes-at-cuts', '--recode-video', 'mp4', '-o', dest, url], {encoding: 'utf8'});
-    if (r.status === 0 && fs.existsSync(dest)) {
-      return {arquivo: dest, tipo: 'video', fonte: 'youtube', url: `${url}&t=${ini}`, autor: canal, titulo, licenca: 'NÃO VERIFICADA (modo relaxado)', licencaUrl: null, verificada: false};
-    }
+    if (r.status !== 0 || !fs.existsSync(dest)) continue;
+    if (brilho(dest) < 28) continue; // escuro demais: tenta o próximo vídeo
+    return {arquivo: dest, tipo: 'video', fonte: 'youtube', url: `${url}&t=${ini}`, autor: canal, titulo, trechoEscolhido: como, licenca: 'NÃO VERIFICADA (modo relaxado)', licencaUrl: null, verificada: false};
   }
   return null;
 }
@@ -131,9 +154,14 @@ async function wikimediaQualquer(query, destDir, id) {
 }
 
 // Tenta as fontes na ordem; devolve {resultado, tentativas} (tentativas explica por que cada fonte não serviu).
-export async function buscarBroll(cfg, query, destDir, id) {
+export async function buscarBroll(cfg, query, destDir, id, opts = {}) {
   const tentativas = [];
   const relaxado = cfg.licencas === 'relaxado';
+  if (opts.youtube) {
+    const res = await youtube(query, destDir, id, opts);
+    if (res) return {resultado: res, tentativas};
+    tentativas.push(`youtube fixado (${opts.youtube}): não baixou ou escuro demais`);
+  }
   const p = propria(cfg, query);
   if (p) return {resultado: p, tentativas};
   tentativas.push('mídia própria: nada com esse assunto');
@@ -146,7 +174,7 @@ export async function buscarBroll(cfg, query, destDir, id) {
       continue;
     }
     try {
-      const res = await fn(query, destDir, id);
+      const res = await fn(query, destDir, id, opts);
       if (res) return {resultado: res, tentativas};
       tentativas.push(`${nome}: nenhum resultado com licença aceita`);
     } catch (e) {

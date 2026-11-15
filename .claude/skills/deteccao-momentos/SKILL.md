@@ -26,6 +26,10 @@ Descarte: trechos que dependem do que veio antes, leitura de tela sem reação, 
 - **Nota de 0 a 10** na justificativa (gancho, especificidade, conflito, payoff, entende sozinho); abaixo de 6, não faça.
 - Confira as bordas: o whisper às vezes adianta palavras para dentro de um silêncio; o script corrige, mas a frase pode "andar" para depois do `end`. Se o relatório disser que um insert não cobre fala, estenda o `end`.
 
+## Layout
+
+O padrão é a **tela dividida o tempo todo** (streamer em cima, o que ele vê embaixo, sincronizado), mesmo com o vídeo pausado. Só marque `solos` em casos raros (ex.: a metade de baixo vira tela preta). A dinâmica vem dos inserts: anote cada coisa que ele cita (outro jogo, lugar, marca, pessoa) para a skill `broll-licenciado`.
+
 ## Gancho (texto na tela nos primeiros 1,5 s)
 
 Não é transcrição: é a **promessa** do corte, em até ~6 palavras, caixa alta, no tom da skill `resenha-ptbr`. Ex.: a fala é "vocês as mulheres não perceberam que tá dando merda?" → gancho "TIROTEIO E ELAS NEM LIGAM".

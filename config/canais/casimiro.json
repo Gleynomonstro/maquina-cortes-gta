@@ -29,6 +29,12 @@
       }
     }
   ],
+  "jogo": {
+    "x": 290,
+    "y": 0,
+    "w": 1192,
+    "h": 1060
+  },
   "marca": {
     "perfil": "@capivaracity.vi",
     "logo": "~/.maquina-cortes-gta/logo.png",

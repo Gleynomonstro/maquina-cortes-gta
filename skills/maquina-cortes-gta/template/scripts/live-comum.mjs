@@ -32,16 +32,19 @@ export const gravacao =(live) => readJson(path.join(live, 'gravacao.json'), {ati
 // As durações ficam em cache em blocos.json.
 export function listBlocks(live) {
   const dir = path.join(live, 'blocos');
-  const names = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^bloco-\d+\.ts$/.test(f)).sort() : [];
   const ativo = gravacao(live).ativo;
   const cacheFile = path.join(live, 'blocos.json');
   const cache = readJson(cacheFile, {});
+  // blocos já apagados (limpeza de disco) continuam na linha do tempo pela duração guardada no cache
+  const naPasta = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^bloco-\d+\.ts$/.test(f)) : [];
+  const names = [...new Set([...naPasta, ...Object.keys(cache)])].sort();
   const blocks = [];
   let t = 0;
   names.forEach((nome, i) => {
     const fechado = !ativo || i < names.length - 1;
     const file = path.join(dir, nome);
-    let dur = fechado ? cache[nome] : undefined;
+    const apagado = !fs.existsSync(file);
+    let dur = fechado || apagado ? cache[nome] : undefined;
     if (dur === undefined) {
       try {
         dur = probeDuration(file);
@@ -50,7 +53,7 @@ export function listBlocks(live) {
       }
       if (fechado) cache[nome] = dur;
     }
-    blocks.push({nome: nome.replace(/\.ts$/, ''), arquivo: file, inicio: t, fim: t + dur, dur, fechado});
+    blocks.push({nome: nome.replace(/\.ts$/, ''), arquivo: file, inicio: t, fim: t + dur, dur, fechado, apagado});
     t += dur;
   });
   writeJson(cacheFile, cache);

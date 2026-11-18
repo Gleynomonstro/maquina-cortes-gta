@@ -37,7 +37,8 @@ const placeVideo = (sx, sy, s, fx, fy, outX, outY, srcW, srcH) => ({
 const Shot = ({shot, sourceFile, srcW, srcH, startFrame, frames}) => {
   const frame = useCurrentFrame();
   // "punch": cada plano entra com um zoom curto (6% → 0) para marcar a troca
-  const punch = interpolate(frame, [0, 7], [1.06, 1], {extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic)});
+  // sem "punch" de zoom a cada plano (o usuário achou artificial, 17/11/2026)
+  const punch = shot.punch ? interpolate(frame, [0, 7], [1.06, 1], {extrapolateRight: "clamp", easing: Easing.out(Easing.cubic)}) : 1;
   const z = shot.zoom * punch;
   const {cam, faceOut} = shot;
   const fx = cam.x + cam.w * cam.rostoX;
@@ -57,7 +58,7 @@ const Shot = ({shot, sourceFile, srcW, srcH, startFrame, frames}) => {
           {video(placeVideo(0, 0, s, fx, fy, st.faceOut.x, st.faceOut.y, srcW, srcH), false)}
         </div>
         <div style={{position: 'absolute', left: 0, top: half, width: W, height: half, overflow: 'hidden'}}>
-          {video(placeVideo(0, 0, sb.escala, sb.cx, sb.cy, W / 2, half / 2, srcW, srcH), true)}
+          {video(placeVideo(0, 0, sb.escala, sb.cx + (sb.panX || 0) * Math.sin((2 * Math.PI * (startFrame + frame)) / (30 * 24)), sb.cy, W / 2, half / 2, srcW, srcH), true)}
         </div>
       </AbsoluteFill>
     );
@@ -80,6 +81,13 @@ const Shot = ({shot, sourceFile, srcW, srcH, startFrame, frames}) => {
       </div>
     </AbsoluteFill>
   );
+};
+
+// flash rápido na virada da abertura "clímax primeiro" para o começo da sequência (o whoosh toca junto, via sfx)
+const Flash = () => {
+  const frame = useCurrentFrame();
+  const o = interpolate(frame, [0, 6], [0.85, 0], {extrapolateRight: 'clamp'});
+  return <AbsoluteFill style={{background: '#fff', opacity: o}} />;
 };
 
 // ---------- inserts ----------
@@ -177,6 +185,18 @@ const Insert = ({ins, cores, sourceFile, srcW, srcH}) => {
   if (ins.modo === 'pip') {
     return (
       <div style={{position: 'absolute', left: 48, top: 420, width: 470, height: 264, borderRadius: 22, overflow: 'hidden', border: '5px solid #fff', boxShadow: '0 12px 40px rgba(0,0,0,0.6)', transform: `scale(${0.8 + 0.2 * enter})`, opacity: enter, transformOrigin: 'top left'}}>
+        {ins.tipo === 'video' ? (
+          <OffthreadVideo src={staticFile(ins.file)} startFrom={Math.round((ins.startIn || 0) * 30)} muted style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+        ) : (
+          <Img src={staticFile(ins.file)} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+        )}
+      </div>
+    );
+  }
+  // modo "baixo": B-roll só na metade de baixo (o streamer continua em cima), no lugar da tela do jogo
+  if (ins.modo === 'baixo' && (ins.tipo === 'video' || ins.tipo === 'imagem')) {
+    return (
+      <div style={{position: 'absolute', left: 0, top: H / 2, width: W, height: H / 2, overflow: 'hidden', background: '#000', opacity: enter}}>
         {ins.tipo === 'video' ? (
           <OffthreadVideo src={staticFile(ins.file)} startFrom={Math.round((ins.startIn || 0) * 30)} muted style={{width: '100%', height: '100%', objectFit: 'cover'}} />
         ) : (
@@ -309,6 +329,7 @@ export const Vertical = (p) => {
         return (
           <Sequence key={`s${i}`} from={from} durationInFrames={frames}>
             <Shot shot={shot} sourceFile={p.sourceFile} srcW={p.sourceWidth} srcH={p.sourceHeight} startFrame={Math.round(shot.from * 30)} frames={frames} />
+            {shot.turn ? <Flash /> : null}
           </Sequence>
         );
       })}

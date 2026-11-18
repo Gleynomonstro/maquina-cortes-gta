@@ -65,9 +65,13 @@ function loadWords() {
       if (t.endsWith(tag)) tag = null;
       continue;
     }
-    out.push({...w, text: t});
+    // traço de diálogo do whisper ("- Beleza.") não vai para a legenda
+    const limpo = t.replace(/^[-–—]+s*/, "");
+    if (!limpo) continue;
+    out.push({...w, text: limpo});
   }
-  return out;
+  // o whisper às vezes devolve palavras fora de ordem ou com fim antes do início: ordena e corrige
+  return out.map((w) => ({...w, endMs: Math.max(w.endMs, w.startMs + 50)})).sort((a, b) => a.startMs - b.startMs);
 }
 // 2) palavras que o whisper marcou dentro de um silêncio vão para os trechos com som logo depois
 function unstick(words) {
@@ -239,19 +243,27 @@ function splitGeom(cam, jogo) {
   return {
     layout: 'dividido',
     top: {escala: s, faceOut: {x: (fx - left) * s, y: (fy - top) * s}},
-    bottom: {escala: sb, cx: jogo.x + jogo.w / 2, cy: jogo.y + jogo.h / 2},
+    // panX: quanto da largura do jogo fica de fora; a metade de baixo desliza devagar para mostrar a imagem inteira
+    bottom: {escala: sb, cx: jogo.x + jogo.w / 2, cy: jogo.y + jogo.h / 2, panX: Math.max(0, (jogo.w - W / sb) / 2)},
     cam: {...r, rostoX: rx, rostoY: ry},
     ampliacao: s,
   };
 }
 
 function makePages(list) {
+  list = [...list];
   const pages = [];
   let cur = [];
   const flush = () => {
     if (cur.length) pages.push({words: cur, startMs: cur[0].startMs, endMs: cur[cur.length - 1].endMs});
     cur = [];
   };
+  // palavra "esticada" pelo whisper não fica acesa por mais de 0,6 s nem invade a próxima
+  list = list.map((w, i) => {
+    const next = list[i + 1];
+    const end = Math.min(w.endMs, w.startMs + 600, next ? next.startMs : Infinity);
+    return {...w, endMs: Math.max(end, w.startMs + 120)};
+  });
   for (const w of list) {
     const gap = cur.length ? w.startMs - cur[cur.length - 1].endMs : 0;
     const chars = cur.reduce((n, x) => n + x.text.length, 0) + w.text.length;
@@ -262,8 +274,9 @@ function makePages(list) {
   flush();
   pages.forEach((p, i) => {
     const next = pages[i + 1];
-    // a legenda fica até a próxima entrar (buracos de até 1,2 s são preenchidos: legenda presente em todos os segundos)
-    p.endMs = next ? (next.startMs - p.endMs < 1200 ? next.startMs : p.endMs + 300) : p.endMs + 400;
+    // a legenda aparece só enquanto ele fala: some ~0,25 s depois da última palavra (preferência do usuário,
+    // 17/11/2026: sem legenda parada nas pausas)
+    p.endMs = Math.min(next ? next.startMs : Infinity, p.endMs + 250);
     p.words = p.words.map((w) => ({...w, text: w.text.replace(/[,;:]$/, '')}));
   });
   return pages;
@@ -288,22 +301,40 @@ async function buildClip(clip) {
   let words = unstick(loadWords());
   const sec = (clip.secundarias || []).map((s) => ({...s}));
   const inSec = (t) => sec.some((s) => t >= s.inicio - 0.05 && t < s.fim);
-  words = words.filter((w) => w.startMs / 1000 >= clip.start - 0.05 && w.startMs / 1000 < clip.end && !inSec(w.startMs / 1000));
+  // `trechos` (opcional): só as partes mais interessantes do momento, emendadas com corte seco. É assim que o corte
+  // fica dinâmico (preferência do usuário, 17/11/2026), em vez de zoom in/zoom out artificial.
+  const trechos = Array.isArray(clip.trechos) && clip.trechos.length ? clip.trechos : [{inicio: clip.start, fim: clip.end}];
+  const trechoDe = (t) => trechos.findIndex((r) => t >= r.inicio - 0.05 && t < r.fim);
+  words = words.filter((w) => trechoDe(w.startMs / 1000) >= 0 && !inSec(w.startMs / 1000));
   if (!words.length) throw new Error(`${id}: nenhuma fala do streamer entre ${clip.start} e ${clip.end}`);
+  // correções de palavras que o whisper errou (ex.: {"arregaceu": "arregacei"}); só troca o texto, não o tempo
+  const corr = Object.fromEntries(Object.entries(clip.correcoes || {}).map(([k, v]) => [k.toLowerCase(), v]));
+  words = words.map((w) => {
+    const m = w.text.match(/^(.*?)([.,!?…]*)$/);
+    const fix = corr[m[1].toLowerCase()];
+    return fix ? {...w, text: fix + m[2]} : w;
+  });
   const sync = snapOnsets(words, loadEnvelope());
 
   // trechos com fala (streamer + jogo); pausas > 0,2 s entre eles são removidas, cortando sempre entre palavras
-  const units = [...words.map((w) => [w.startMs / 1000, w.endMs / 1000]), ...sec.map((s) => [s.inicio, s.fim])].sort((a, b) => a[0] - b[0]);
+  // trecho com `inteiro: true` mantém tudo, mesmo sem fala (ex.: a luta antes da reação): gameplay que dá contexto
+  const units = [
+    ...words.map((w) => [w.startMs / 1000, w.endMs / 1000]),
+    ...sec.filter((s) => trechoDe(s.inicio) >= 0).map((s) => [s.inicio, s.fim]),
+    ...trechos.filter((t) => t.inteiro).map((t) => [t.inicio, t.fim - 0.1]),
+  ].sort((a, b) => a[0] - b[0]);
   const PRE = 0.06;
   const POS = 0.1;
   const segs = [];
   let pausas = 0;
   let pausaTempo = 0;
-  let a = Math.max(clip.start, units[0][0] - PRE);
+  let a = Math.max(trechos[trechoDe(units[0][0])]?.inicio ?? clip.start, units[0][0] - PRE);
   let b = units[0][1] + POS;
   for (let i = 1; i < units.length; i++) {
     const [s, e] = units[i];
-    if (s - (b - POS) > 0.2 && s - PRE > b) {
+    // corte obrigatório na troca de trecho; dentro do trecho, pausas > 0,2 s
+    const outroTrecho = trechoDe(s) !== trechoDe(units[i - 1][0]);
+    if (outroTrecho || (s - (b - POS) > 0.2 && s - PRE > b)) {
       pausas++;
       pausaTempo += s - PRE - b;
       segs.push({from: a, to: b});
@@ -325,12 +356,27 @@ async function buildClip(clip) {
       let c = s.from;
       while (s.to - c > alvo + 0.4) {
         const cand = starts.filter((t) => t > c + 0.8 && t < s.to - 0.6).sort((x, y) => Math.abs(x - (c + alvo)) - Math.abs(y - (c + alvo)))[0];
-        if (!cand || cand - c > alvo + 0.6) break;
+        if (!cand || cand - c > alvo + 0.6) {
+          // nenhuma palavra começa perto do ponto de corte (fala esparsa, som de jogo alto): corta no ponto alvo se
+          // ele cair entre palavras; se cair no meio de uma palavra, corta logo depois dela
+          let t = c + alvo;
+          const dentro = words.find((w) => t > w.startMs / 1000 && t < w.endMs / 1000);
+          // palavra "esticada" pelo whisper (mais de 1 s) não é confiável: corta no alvo mesmo
+          if (dentro && dentro.endMs - dentro.startMs <= 1000) t = dentro.endMs / 1000 + 0.02;
+          if (t >= s.to - 0.6 || t - c < 0.8) break;
+          shots.push({from: c, to: t});
+          c = t;
+          continue;
+        }
         shots.push({from: c, to: cand});
         c = cand;
       }
       shots.push({from: c, to: s.to});
     }
+    // ABERTURA "clímax primeiro" (cold open): 1 a 2 s do ponto mais forte do próprio corte vêm antes de tudo; depois
+    // um flash e a sequência começa do início. `abertura: {"tipo": "climax", "inicio": s, "fim": s}` (tempos da origem).
+    const ab = clip.abertura;
+    if (ab && ab.tipo === 'climax' && ab.fim > ab.inicio) shots.unshift({from: ab.inicio, to: Math.min(ab.fim, ab.inicio + 2.2), cold: true});
     let out = 0;
     // layout de cada plano: "dividido" (streamer em cima, o que ele vê embaixo, sincronizado) é o PADRÃO sempre que
     // a configuração tem a área `jogo` (preferência do usuário, 15/11/2026: fica menos vazio, mesmo com o vídeo
@@ -349,7 +395,9 @@ async function buildClip(clip) {
       const g = div ? splitGeom(cams[k], canal.jogo) : {...geoms[k], layout: 'solo'};
       // zoom alterna a cada plano (nunca abaixo de 1,04-1,06 quando a moldura da câmera poderia aparecer)
       const base = div ? 1.04 : g.modo === 'desfocado' ? 1.06 : 1.0;
-      const r = {...sh, ...g, camIndex: k, zoom: i === 0 ? base + 0.08 : i % 2 ? base : base + 0.1, outStart: out};
+      // zoom constante (sem zoom in/zoom out a cada plano: o usuário achou artificial, 17/11/2026); só a abertura
+      // "clímax primeiro" fica um pouco mais perto
+      const r = {...sh, ...g, camIndex: k, zoom: sh.cold ? base + 0.1 : base, outStart: out, turn: i === 1 && !!shots[0].cold};
       out += Math.max(1, Math.round((sh.to - sh.from) * FPS)) / FPS;
       return r;
     });
@@ -362,21 +410,37 @@ async function buildClip(clip) {
   for (let tentativa = 0; tentativa < 4; tentativa++) {
     shots = plan(alvo);
     const total = shots.reduce((t, s) => t + Math.max(1, Math.round((s.to - s.from) * FPS)) / FPS, 0);
+    // o trecho repetido da abertura não conta para o mapeamento: cada tempo da origem aponta para a sequência normal
+    const normais = shots.filter((x) => !x.cold);
+    const cold = shots.find((x) => x.cold);
     const toOut = (t) => {
-      const s = shots.find((x) => t >= x.from - 0.02 && t < x.to) ?? (t < shots[0].from ? shots[0] : shots[shots.length - 1]);
+      const s = normais.find((x) => t >= x.from - 0.02 && t < x.to) ?? (t < normais[0].from ? normais[0] : normais[normais.length - 1]);
       return Math.min(total, Math.max(0, s.outStart + Math.min(t, s.to) - s.from));
     };
     const quant = [];
     const remap = words
       .map((w) => {
         const s = w.startMs / 1000;
-        if (!shots.some((x) => s >= x.from - 0.02 && s < x.to)) return null;
+        if (!normais.some((x) => s >= x.from - 0.02 && s < x.to)) return null;
         const o = toOut(s);
         quant.push(Math.abs(Math.round(o * FPS) / FPS - o));
         return {text: w.text.toUpperCase(), startMs: Math.round(o * 1000), endMs: Math.round(Math.min(total, o + Math.max(0.12, (w.endMs - w.startMs) / 1000)) * 1000)};
       })
       .filter(Boolean);
-    const pages = makePages(remap);
+    let pages = makePages(remap);
+    if (cold) {
+      // as palavras do clímax aparecem duas vezes: na abertura e no lugar delas na sequência
+      const coldWords = words
+        .filter((w) => w.startMs / 1000 >= cold.from - 0.02 && w.startMs / 1000 < cold.to)
+        .map((w) => {
+          const o = cold.outStart + w.startMs / 1000 - cold.from;
+          return {text: w.text.toUpperCase(), startMs: Math.round(o * 1000), endMs: Math.round(Math.min(cold.outStart + cold.to - cold.from, o + Math.max(0.12, (w.endMs - w.startMs) / 1000)) * 1000)};
+        });
+      const cp = makePages(coldWords);
+      const coldFim = Math.round((cold.outStart + cold.to - cold.from) * 1000);
+      cp.forEach((p) => (p.endMs = Math.min(p.endMs, coldFim)));
+      pages = [...cp, ...pages];
+    }
     const secundarias = sec.map((s) => ({texto: s.texto, rotulo: (s.rotulo || 'JOGO').toUpperCase(), startMs: Math.round(toOut(s.inicio) * 1000), endMs: Math.round(toOut(s.fim) * 1000)}));
 
     // inserts (na primeira tentativa resolve os arquivos; depois só recalcula tempos)
@@ -424,11 +488,13 @@ async function buildClip(clip) {
         // de uma vez para outra e um insert bom poderia piorar ao renderizar de novo
         const cacheF = path.join(work, 'broll', 'cache.json');
         const cache = fs.existsSync(cacheF) ? readJson(cacheF) : {};
-        const chave = JSON.stringify([ins.busca || ins.texto || '', ins.youtube || null, ins.trecho ?? null]);
+        // B-roll na metade de baixo pode rodar mais tempo (até 12 s), cobrindo o assunto inteiro da fala
+        const durB = ins.modo === 'baixo' ? Math.min(12, Math.max(4, Math.ceil(ins.fim - ins.inicio + 1))) : 4;
+        const chave = JSON.stringify([ins.busca || ins.texto || '', ins.youtube || null, ins.trecho ?? null, ...(durB !== 4 ? [durB] : [])]);
         let resultado = cache[chave] && fs.existsSync(cache[chave].arquivo) ? cache[chave] : null;
         let tentativas = [];
         if (!resultado) {
-          ({resultado, tentativas} = await buscarBroll(canal, ins.busca || ins.texto || '', path.join(work, 'broll'), `${id}-${k}`, {trecho: ins.trecho, youtube: ins.youtube}));
+          ({resultado, tentativas} = await buscarBroll(canal, ins.busca || ins.texto || '', path.join(work, 'broll'), `${id}-${k}`, {trecho: ins.trecho, youtube: ins.youtube, dur: durB}));
           if (resultado) {
             cache[chave] = resultado;
             fs.mkdirSync(path.dirname(cacheF), {recursive: true});
@@ -453,7 +519,8 @@ async function buildClip(clip) {
       const r0 = ins._r;
       // zoom/replay ficam na metade de baixo por padrão (o streamer continua em cima)
       const modo = ins.modo === 'pip' ? 'pip' : ins.modo === 'cheio' ? 'cheio' : r0.tipo === 'jogo' || ins.modo === 'baixo' ? 'baixo' : 'cheio';
-      const dur = Math.min(Math.max(toOut(ins.fim) - at, 2), modo === 'cheio' ? 3 : 4, total - at);
+      const longo = modo === 'baixo' && r0.tipo === 'video'; // B-roll embaixo: roda o trecho inteiro da fala (até 12 s)
+      const dur = Math.min(Math.max(toOut(ins.fim) - at, 2), modo === 'cheio' ? 3 : longo ? 12 : 4, total - at);
       if (dur < 1) continue;
       const r = ins._r;
       inserts.push({
@@ -461,7 +528,7 @@ async function buildClip(clip) {
         texto: (ins.texto || ins.busca || '').toUpperCase(), subtexto: ins.subtexto ? ins.subtexto.toUpperCase() : null,
         // crédito na tela só para licença verificada (ex.: CC BY exige); o não verificado fica só no registro de fontes
         credito: r.fonte && r.fonte.autor && r.fonte.tipo !== 'origem' && r.fonte.verificada !== false ? `${r.fonte.autor} · ${r.fonte.licenca}` : null,
-        rect: r.rect, zoomDe: r.zoomDe, zoomAte: r.zoomAte, fadeIn: 6, fadeOut: 6,
+        rect: r.rect, zoomDe: r.zoomDe, zoomAte: r.zoomAte, fadeIn: longo ? 15 : 6, fadeOut: longo ? 15 : 6, longo,
         _fonte: r.fonte, _src: [ins.inicio, ins.fim], _fala: ins._fala,
       });
     }
@@ -481,6 +548,18 @@ async function buildClip(clip) {
       }
     }
     for (let i = inserts.length - 1; i >= 0; i--) if (inserts[i].dur < 1) inserts.splice(i, 1);
+    // B-roll longo embaixo: fresta curta (< 1,5 s) entre dois inserts some. O longo começa um pouco antes (ou o anterior
+    // longo dura um pouco mais), para a imagem do jogo não piscar no meio da sequência
+    for (let i = 1; i < inserts.length; i++) {
+      const p = inserts[i - 1];
+      const c = inserts[i];
+      const gap = c.at - (p.at + p.dur);
+      if (gap <= 0 || gap >= 1.5) continue;
+      if (c.longo) {
+        c.at -= gap;
+        c.dur += gap;
+      } else if (p.longo) p.dur += gap;
+    }
     // transições: cada insert entra e sai com o mesmo fade curto. Dois inserts colados (menos de 0,25 s entre eles)
     // viram uma FUSÃO: o anterior fica inteiro por baixo até o próximo terminar de aparecer por cima (nada de "sai um,
     // entra o outro" no mesmo instante).
@@ -488,7 +567,8 @@ async function buildClip(clip) {
       const p = inserts[i - 1];
       const c = inserts[i];
       if (c.at - (p.at + p.dur) < 0.25 && (p.modo === c.modo || c.modo === 'cheio')) {
-        p.dur = c.at - p.at + 0.2;
+        // o anterior continua por baixo enquanto o próximo aparece (troca suave, sem corte seco)
+        p.dur = c.at - p.at + Math.max(0.2, (c.fadeIn || 6) / 30);
         p.fadeOut = 0;
       }
     }
@@ -514,6 +594,8 @@ async function buildClip(clip) {
     const pop = sfxFile('pop');
     if (imp) sfx.push({file: imp, at: 0, volume: 0.35});
     for (const i of inserts) if (who) sfx.push({file: who, at: Math.max(0, i.at - 0.08), volume: 0.3});
+    const virada = shots.find((x) => x.turn);
+    if (virada && who) sfx.push({file: who, at: Math.max(0, virada.outStart - 0.1), volume: 0.35});
     for (const d of destaques) if (pop) sfx.push({file: pop, at: d.at, volume: 0.3});
 
     // ---- checagens que dá para corrigir sozinho antes do render
@@ -569,7 +651,7 @@ async function buildClip(clip) {
     };
     props = {
       totalSeconds: total, sourceFile: 'source.mp4', sourceWidth: meta.width, sourceHeight: meta.height,
-      shots: shots.map((s) => ({from: s.from, to: s.to, layout: s.layout, modo: s.modo, escala: s.escala, zoom: s.zoom, faceOut: s.faceOut, caixa: s.caixa, cam: s.cam, top: s.top, bottom: s.bottom})),
+      shots: shots.map((s) => ({from: s.from, to: s.to, turn: !!s.turn, cold: !!s.cold, layout: s.layout, modo: s.modo, escala: s.escala, zoom: s.zoom, faceOut: s.faceOut, caixa: s.caixa, cam: s.cam, top: s.top, bottom: s.bottom})),
       faixas,
       inserts: inserts.map(({_fonte, _src, _fala, ...i}) => i),
       pages, secundarias, destaques, hook, sfx, cores,
@@ -577,16 +659,18 @@ async function buildClip(clip) {
       watermark: {logo: null, name: canal.marca?.perfil || '', posicao: canal.marca?.posicao || 'superior-direito'},
     };
     props._inserts = inserts;
-    if (maxSem <= 3 && !semLegenda.length) break;
+    // o ritmo agora vem do conteúdo (trechos emendados, inserts), não de dividir planos: uma passada basta
+    break;
     alvo = Math.max(1.6, alvo - 0.3); // corrige: planos mais curtos e tenta de novo
   }
 
   // ---- checagens que só o Claude corrige (texto e duração)
   const md = clip.metadados || {};
-  if (checks.duracao > 60) falhas.push(`duração ${checks.duracao.toFixed(1)} s (máximo 60): escolha um trecho menor.`);
+  const durMax = Number(canal.duracaoMax) || 60;
+  if (checks.duracao > durMax) falhas.push(`duração ${checks.duracao.toFixed(1)} s (máximo ${durMax}): escolha um trecho menor.`);
   if (checks.duracao < 15) avisos.push(`duração ${checks.duracao.toFixed(1)} s: curto (ideal 30 a 45 s).`);
-  if (checks.maxSemMudanca > 3) falhas.push(`intervalo sem mudança visual de ${checks.maxSemMudanca} s (máximo 3): adicione um destaque ou insert.`);
-  if (checks.segundosSemLegenda.length) falhas.push(`segundos sem legenda: ${checks.segundosSemLegenda.join(', ')}.`);
+  // sem zoom artificial, trechos longos sem corte são possíveis: vira aviso (encurte com `trechos` se ficar arrastado)
+  if (checks.maxSemMudanca > 6) avisos.push(`${checks.maxSemMudanca} s seguidos sem corte nem insert: se ficar arrastado, use "trechos" para emendar só as partes boas.`);
   if (!clip.gancho) falhas.push('falta o texto do gancho (campo "gancho").');
   if (!md.titulo || md.titulo.length > 60) falhas.push(`título ausente ou com mais de 60 caracteres (${(md.titulo || '').length}).`);
   if (!Array.isArray(md.hashtags) || md.hashtags.length < 5 || md.hashtags.length > 8) falhas.push('use de 5 a 8 hashtags.');
@@ -652,6 +736,19 @@ async function buildClip(clip) {
     formato: {resolucao: '1080x1920', fps: FPS, video: 'H.264', audio: 'AAC 48 kHz', loudnessAlvo: '-14 LUFS'},
     titulo: md.titulo, descricao: md.descricao, hashtags: md.hashtags, justificativa: md.justificativa,
     gancho: clip.gancho,
+    // corte de reserva (nota 5–6): gerado para o usuário avaliar, não é prioridade
+    reserva: !!clip.reserva,
+    nota: clip.nota ?? null,
+    abertura: clip.abertura?.tipo === 'climax'
+      ? {tipo: 'climax-primeiro', trechoOrigem: {inicio: clip.abertura.inicio, fim: clip.abertura.fim}, porque: clip.abertura.porque || null}
+      : {tipo: 'acao-direta', porque: clip.abertura?.porque || null},
+    live: cortes.live?.inicioGravacao
+      ? (() => {
+          const momento = Date.parse(cortes.live.inicioGravacao) + ((cortes.live.offset || 0) + (clip.abertura?.tipo === 'climax' ? clip.abertura.inicio : clip.start)) * 1000;
+          const pronto = Date.now();
+          return {momento: new Date(momento).toISOString(), pronto: new Date(pronto).toISOString(), atrasoSegundos: Math.round((pronto - momento) / 1000), horarioNaLive: hms((cortes.live.offset || 0) + clip.start)};
+        })()
+      : null,
     origem: {url: origem.url || null, canal: canal.nome, autorizacao: canal.autorizacao || null, inicio: clip.start, fim: clip.end, inicioHms: hms(clip.start), fimHms: hms(clip.end)},
     fontes,
     checagem: {...checks, audio, aprovado: !falhas.length, falhas, avisos},
@@ -674,10 +771,22 @@ function masterAudio(raw, final) {
   const m = JSON.parse(p1.stderr.slice(p1.stderr.lastIndexOf('{'), p1.stderr.lastIndexOf('}') + 1));
   const ln2 = `${LN}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
   execFileSync('ffmpeg', ['-y', '-v', 'error', ...inputs, '-filter_complex', `${pre},${ln2},aresample=48000[a]`, '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', final]);
-  const e = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', final, '-af', 'ebur128=peak=true', '-f', 'null', '-'], {encoding: 'utf8', maxBuffer: 1 << 26});
-  const sum = e.stderr.slice(e.stderr.lastIndexOf('Summary'));
-  const num = (re) => Number((sum.match(re) || [])[1]);
-  return {integrado: num(/I:\s+(-?[0-9.]+) LUFS/), picoReal: num(/Peak:\s+(-?[0-9.]+) dBFS/), musica: temMusica ? musica : null};
+  const medir = (file) => {
+    const e = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', file, '-af', 'ebur128=peak=true', '-f', 'null', '-'], {encoding: 'utf8', maxBuffer: 1 << 26});
+    const sum = e.stderr.slice(e.stderr.lastIndexOf('Summary'));
+    const num = (re) => Number((sum.match(re) || [])[1]);
+    return {integrado: num(/I:\s+(-?[0-9.]+) LUFS/), picoReal: num(/Peak:\s+(-?[0-9.]+) dBFS/)};
+  };
+  let r = medir(final);
+  // som com picos altos (jogo, gritos): o loudnorm linear não chega a -14 sem estourar o pico. Corrige com ganho +
+  // limitador (pico máximo ~-1,5 dBFS) e mede de novo, até 2 vezes
+  for (let i = 0; i < 2 && Math.abs(r.integrado + 14) > 0.5; i++) {
+    const tmp = final.replace(/\.mp4$/, '.ajuste.mp4');
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', final, '-af', `volume=${(-14 - r.integrado).toFixed(2)}dB,alimiter=limit=0.84:attack=5:release=50:level=false,aresample=48000`, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', tmp]);
+    fs.renameSync(tmp, final);
+    r = medir(final);
+  }
+  return {...r, musica: temMusica ? musica : null};
 }
 
 function relatorio(m) {
@@ -690,14 +799,14 @@ function relatorio(m) {
 
 | Item | Valor | OK |
 |---|---|---|
-| Duração | ${c.duracao.toFixed(1)} s (máx. 60, ideal 30–45) | ${ok(c.duracao <= 60)} |
+| Duração | ${c.duracao.toFixed(1)} s (máx. ${Number(canal.duracaoMax) || 60}, ideal 30–45) | ${ok(c.duracao <= (Number(canal.duracaoMax) || 60))} |
 | Pausas removidas | ${c.pausasRemovidas} (${c.tempoDePausaRemovido} s) | ✅ |
 | Trocas de plano | ${c.trocasDePlano} | ✅ |
-| Maior intervalo sem mudança visual | ${c.maxSemMudanca} s (máx. 3) | ${ok(c.maxSemMudanca <= 3)} |
+| Maior intervalo sem corte/insert | ${c.maxSemMudanca} s (aviso acima de 6) | ${c.maxSemMudanca <= 6 ? '✅' : '⚠️'} |
 | Tempo com B-roll | ${c.brollPercentual}% | ✅ |
 | Sincronia da legenda | antes da correção: média ${s.erroAntesMedioMs ?? '–'} ms, máx. ${s.erroAntesMaxMs ?? '–'} ms em ${s.palavrasMedidas} palavras após pausa; ${s.corrigidas} corrigidas; erro de quadro máx. ${s.erroQuadroMaxMs} ms | ${ok(s.erroQuadroMaxMs <= 100)} |
 | Áudio | ${c.audio ? `${c.audio.integrado} LUFS, pico ${c.audio.picoReal} dBTP` : 'não renderizado'} (alvo -14) | ${ok(!c.audio || Math.abs(c.audio.integrado + 14) <= 1)} |
-| Legenda em todos os segundos | ${c.segundosSemLegenda.length ? 'faltou em ' + c.segundosSemLegenda.join(', ') : 'sim'} | ${ok(!c.segundosSemLegenda.length)} |
+| Legenda | só durante a fala (some nas pausas); ${c.segundosSemLegenda.length} s sem legenda | ✅ |
 | Legendas fora dos 20% de cima e de baixo | ${c.legendaNaFaixaSegura ? 'sim' : 'não'} | ${ok(c.legendaNaFaixaSegura)} |
 | Streamer centralizado | ${c.centralizado.solo ? 'sozinho' : 'vários falantes'}; desvio máx. ${c.centralizado.maxDesvioX}px; rosto entre y=${c.centralizado.rostoYMin} e ${c.centralizado.rostoYMax} (terço central: 640–1280) | ${ok(c.centralizado.maxDesvioX <= 60 && c.centralizado.rostoYMin >= 640 && c.centralizado.rostoYMax <= 1280)} |
 | Enquadramento | ${c.modoEnquadramento}, câmera ampliada ${c.ampliacaoCamera}x | ✅ |

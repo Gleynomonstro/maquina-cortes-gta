@@ -67,6 +67,8 @@ Tempos em **segundos do vídeo de origem** (os mesmos do `transcript-text.mjs`).
 
 **Layout por vídeo:** a câmera e a área do jogo mudam de VOD para VOD; ponha `"layoutOrigem": {"cameras": [...], "jogo": {...}}` no `cortes.json` para sobrescrever a configuração do canal.
 
+**Rodada de 17/11/2026 (live do alanzoka):** legenda **só enquanto o streamer fala** (some ~0,25 s depois da última palavra); **sem `destaques`** (texto por cima da legenda ficou desconexo); **sem zoom in/zoom out** a cada plano (zoom constante). O ritmo vem do conteúdo: `"trechos": [{"inicio", "fim"}, ...]` emenda só as partes boas com corte seco, e `"inteiro": true` num trecho mantém a gameplay sem fala (ex.: a luta antes da reação). `"correcoes": {"arregaceu": "arregacei"}` corrige palavras que o whisper errou. B-roll **só para referência de fora do contexto** (outro jogo citado como zoeira, cidade, país, pessoa); se o streamer fala do gênero do próprio jogo (MOBA jogando MOBA), sem insert.
+
 **Sem cartões gráficos:** não use `tipo: "cartao"` (texto animado sobre fundo colorido); o usuário achou "nada a ver". Se não houver clipe ou imagem do assunto, o insert é descartado.
 
 **Referência fora do GTA = insert:** quando o streamer cita algo que não é do GTA (outro jogo, cidade, país, marca, pessoa, filme), cubra a fala com um `broll` desse assunto (ex.: "É tipo FIFA?" → gameplay de FIFA; "o Rio não é assim" → Rio de Janeiro; "coisa de americano" → bandeira dos EUA).

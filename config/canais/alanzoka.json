@@ -1,0 +1,49 @@
+{
+  "nome": "alanzoka (Twitch)",
+  "idioma": "pt",
+  "licencas": "relaxado",
+  "trilhaJogo": null,
+  "autorizacao": {
+    "registrada": false,
+    "detalhes": "PENDENTE: teste da Fase 2, sem publicação."
+  },
+  "cameras": [
+    {
+      "nome": "alanzoka",
+      "rect": {
+        "x": 4,
+        "y": 2,
+        "w": 278,
+        "h": 180
+      },
+      "rosto": {
+        "x": 0.66,
+        "y": 0.54
+      }
+    }
+  ],
+  "jogo": {
+    "x": 300,
+    "y": 0,
+    "w": 810,
+    "h": 720
+  },
+  "marca": {
+    "perfil": "@capivaracity.vi",
+    "logo": "~/.maquina-cortes-gta/logo.png",
+    "posicao": "superior-direito"
+  },
+  "cores": {
+    "palavraAtiva": "#FFD400",
+    "secundaria": "#9DB4D0",
+    "gancho": "#FFD400",
+    "cartao": [
+      "#2B0A4A",
+      "#C2185B"
+    ]
+  },
+  "midiaPropria": null,
+  "sfx": "~/.maquina-cortes-gta/sfx",
+  "musica": null,
+  "rockstarAprovadas": []
+}

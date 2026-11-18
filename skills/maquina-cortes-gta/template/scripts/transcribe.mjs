@@ -33,7 +33,10 @@ fs.writeFileSync(path.join(work, 'meta.json'), JSON.stringify(meta, null, 2));
 const wav = path.resolve(work, 'audio16k.wav');
 // first_pts=0: se o áudio começa depois do vídeo (comum no 1º bloco de uma live do YouTube), completa o começo com
 // silêncio, para os tempos da transcrição baterem com os do vídeo.
-execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', video, ...(maxSeconds ? ['-t', String(maxSeconds)] : []), '-vn', '-af', 'aresample=async=1:first_pts=0', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', wav]);
+// Para o whisper, o áudio passa por um filtro de VOZ (corta graves e agudos fora da fala e reduz ruído constante):
+// com som de jogo alto, isso deixa os tempos por palavra bem mais próximos da fala real. TRANSCRIBE_SEM_FILTRO=1 desliga.
+const filtroVoz = process.env.TRANSCRIBE_SEM_FILTRO ? '' : ',highpass=f=150,lowpass=f=4000,afftdn=nf=-25';
+execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', video, ...(maxSeconds ? ['-t', String(maxSeconds)] : []), '-vn', '-af', `aresample=async=1:first_pts=0${filtroVoz}`, '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', wav]);
 
 // silêncios (para cortar as pausas depois)
 const sd = spawnSync('ffmpeg', ['-hide_banner', '-i', wav, '-af', 'silencedetect=noise=-35dB:d=0.45', '-f', 'null', '-'], {encoding: 'utf8'});

@@ -140,9 +140,10 @@ async function youtube(query, destDir, id, opts = {}) {
   const cands = (info.stdout || '').trim().split(/\r?\n/).map((l) => l.split('\t')).filter((c) => Number(c[1]) >= 20);
   for (const [vid, dur, canal, url, titulo] of cands) {
     const {ini, como} = escolherTrecho(url, Number(dur), opts.trecho);
-    const dest = path.join(destDir, `${id}-youtube-${vid}.mp4`);
+    const durT = opts.dur || 4;
+    const dest = path.join(destDir, `${id}-youtube-${vid}-${ini}-${durT}.mp4`);
     fs.rmSync(dest, {force: true});
-    const r = spawnSync('yt-dlp', ['--no-warnings', '-q', '-f', 'bv*[height<=1080][ext=mp4]/bv*[height<=1080]/b', '--download-sections', `*${ini}-${ini + 4}`, '--force-keyframes-at-cuts', '--recode-video', 'mp4', '-o', dest, url], {encoding: 'utf8'});
+    const r = spawnSync('yt-dlp', ['--no-warnings', '-q', '-f', 'bv*[height<=1080][ext=mp4]/bv*[height<=1080]/b', '--download-sections', `*${ini}-${ini + durT}`, '--force-keyframes-at-cuts', '--recode-video', 'mp4', '-o', dest, url], {encoding: 'utf8'});
     if (r.status !== 0 || !fs.existsSync(dest)) continue;
     if (brilho(dest) < 28) continue; // escuro demais: tenta o próximo vídeo
     return {arquivo: dest, tipo: 'video', fonte: 'youtube', url: `${url}&t=${ini}`, autor: canal, titulo, trechoEscolhido: como, licenca: 'NÃO VERIFICADA (modo relaxado)', licencaUrl: null, verificada: false};

@@ -63,7 +63,7 @@ const source = path.join(work, 'source.mp4');
 let tail = 0;
 
 console.log(`> Preparando ${alvo.nome}`);
-if (prev && overlap > 0) {
+if (prev && !prev.apagado && overlap > 0) {
   // fim do bloco anterior (corte sem recodificar: começa no keyframe mais próximo, por isso medimos a duração real)
   const tailFile = path.join(work, 'tail.ts');
   execFileSync('ffmpeg', ['-y', '-v', 'error', ...PROBE, '-ss', String(Math.max(0, prev.dur - overlap)), '-i', prev.arquivo, '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', tailFile]);

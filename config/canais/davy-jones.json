@@ -1,0 +1,114 @@
+{
+  "$comentario": "Configuração de uma FONTE (o canal de onde vêm os VODs) + a marca do SEU perfil nos cortes. Formato em config/canais/LEIAME.md.",
+  "nome": "Davy Jones GTA 6 (Flow Games News)",
+  "idioma": "pt",
+  "licencas": "relaxado",
+  "trilhaJogo": null,
+  "autorizacao": {
+    "registrada": false,
+    "detalhes": "PENDENTE: registre a permissão do canal Davy Jones GTA 6 / Flow Games (link, print ou e-mail e a data)."
+  },
+  "cameras": [
+    {
+      "nome": "cam-sup-esq",
+      "rect": {
+        "x": 1,
+        "y": 184,
+        "w": 366,
+        "h": 368
+      },
+      "rosto": {
+        "x": 0.53,
+        "y": 0.27
+      },
+      "boca": {
+        "x": 0.53,
+        "y": 0.37,
+        "w": 0.3,
+        "h": 0.14
+      }
+    },
+    {
+      "nome": "cam-sup-dir",
+      "rect": {
+        "x": 1553,
+        "y": 184,
+        "w": 366,
+        "h": 368
+      },
+      "rosto": {
+        "x": 0.5,
+        "y": 0.22
+      },
+      "boca": {
+        "x": 0.5,
+        "y": 0.32,
+        "w": 0.3,
+        "h": 0.14
+      }
+    },
+    {
+      "nome": "cam-inf-esq",
+      "rect": {
+        "x": 1,
+        "y": 556,
+        "w": 366,
+        "h": 368
+      },
+      "rosto": {
+        "x": 0.44,
+        "y": 0.27
+      },
+      "boca": {
+        "x": 0.44,
+        "y": 0.37,
+        "w": 0.3,
+        "h": 0.14
+      }
+    },
+    {
+      "nome": "cam-inf-dir",
+      "rect": {
+        "x": 1553,
+        "y": 556,
+        "w": 366,
+        "h": 368
+      },
+      "rosto": {
+        "x": 0.57,
+        "y": 0.3
+      },
+      "boca": {
+        "x": 0.57,
+        "y": 0.4,
+        "w": 0.3,
+        "h": 0.14
+      }
+    }
+  ],
+  "jogo": {
+    "x": 370,
+    "y": 218,
+    "w": 1180,
+    "h": 665
+  },
+  "marca": {
+    "perfil": "@capivaracity.vi",
+    "logo": "~/.maquina-cortes-gta/logo.png",
+    "posicao": "superior-direito"
+  },
+  "cores": {
+    "palavraAtiva": "#FFD400",
+    "secundaria": "#9DB4D0",
+    "gancho": "#FFD400",
+    "cartao": [
+      "#2B0A4A",
+      "#C2185B"
+    ]
+  },
+  "midiaPropria": null,
+  "sfx": "~/.maquina-cortes-gta/sfx",
+  "musica": null,
+  "rockstarAprovadas": [],
+  "duracaoMax": 90
+}

@@ -60,6 +60,10 @@ O formato novo: **o streamer centralizado em tela cheia**, gancho em texto grand
 node ~/.maquina-cortes-gta/engine/scripts/vertical.mjs work config/canais/<canal>.json saida
 ```
 
+## Fase 2: cortes de uma live da Twitch enquanto ela acontece
+
+A skill [`live-capture`](skills/live-capture/SKILL.md) grava a live com o **streamlink** em blocos de 2,5 min, lê o chat como visitante anônimo (só leitura, sem credenciais), transcreve cada bloco, cruza **picos de reação no áudio** com **rajadas de chat** e manda os momentos com nota 6+ para o corte vertical da Fase 1, com abertura de **ação direta** ou **clímax primeiro**. O status da live é checado pelo servidor MCP `twitch`. Avisa o atraso real de cada corte (do momento na live até o corte pronto). Nada é publicado.
+
 ## Modo ao vivo (live acontecendo agora)
 
 > /maquina-cortes-gta faz cortes dessa live enquanto ela rola: https://www.twitch.tv/STREAMER

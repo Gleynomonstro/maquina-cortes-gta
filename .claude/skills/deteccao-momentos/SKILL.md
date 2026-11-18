@@ -7,6 +7,10 @@ description: Escolhe os melhores momentos de um VOD ou live transcrito para vira
 
 Entrada: a transcrição (`node ~/.maquina-cortes-gta/engine/scripts/transcript-text.mjs work`) e, se for útil, um mosaico de quadros (`live-quadros.mjs work/source.mp4 work/quadros.jpg --cada 30`). Saída: para cada corte, `start`, `end`, `gancho` e `metadados.justificativa` no `cortes.json` (formato em `skills/maquina-cortes-gta/references/vertical.md`).
 
+## Regra principal (17/11/2026)
+
+Corte vertical = **momento explosivo do streamer**: rage, risada de verdade, espanto/susto, elogio empolgado ou xingamento ao jogo, descoberta de algo secreto, ação forte na tela com reação junto. O chat confirma, mas não decide sozinho. Momento calmo, informativo ou de contexto vai para o vídeo longo, não para o corte. **Só nota 7+.** Em live, meça antes com `skills/live-capture/scripts/sinais.mjs` (energia 0–10 por janela de 5 s, com rótulos) e use a tabela de nota de `skills/live-capture/SKILL.md`.
+
 ## O que procurar (em ordem de força)
 
 1. **Reação forte a algo na tela**: choque, gargalhada, indignação ("QUE ISSO?", "INJOGÁVEL"). O que ele vê precisa caber num insert `origem`.
@@ -25,6 +29,10 @@ Descarte: trechos que dependem do que veio antes, leitura de tela sem reação, 
 - Um assunto por corte; cortes diferentes não repetem o mesmo gancho.
 - **Nota de 0 a 10** na justificativa (gancho, especificidade, conflito, payoff, entende sozinho); abaixo de 6, não faça.
 - Confira as bordas: o whisper às vezes adianta palavras para dentro de um silêncio; o script corrige, mas a frase pode "andar" para depois do `end`. Se o relatório disser que um insert não cobre fala, estenda o `end`.
+
+## Dinâmica (sem zoom artificial)
+
+Escolha com `trechos` só as partes boas do momento (corte seco entre elas) e marque `inteiro: true` no trecho de gameplay de ação que precisa aparecer mesmo sem fala (a luta antes do grito). Não use `destaques` nem zoom.
 
 ## Layout
 

@@ -2,7 +2,7 @@
   "$comentario": "Configuração de uma FONTE (o canal de onde vêm os VODs) + a marca do SEU perfil nos cortes. Formato em config/canais/LEIAME.md.",
   "nome": "Davy Jones GTA 6 (Flow Games News)",
   "idioma": "pt",
-  "licencas": "relaxado",
+  "licencas": "estrito",
   "trilhaJogo": null,
   "autorizacao": {
     "registrada": false,

@@ -704,6 +704,8 @@ async function buildClip(clip) {
       fontes.push({tipo: 'sfx', arquivo: n, licenca: 'NÃO VERIFICADA (modo relaxado)', ...(lic[n] || {}), licencaVerificada: !!lic[n], trechoCorte: {inicio: s.at}});
     }
   }
+  const terceiros = fontes.filter((f) => f.licencaVerificada === false && f.tipo !== 'origem');
+  if (terceiros.length && !relaxado) falhas.push(`${terceiros.length} fonte(s) de terceiros sem licença verificada (modo estrito): ${terceiros.map((f) => f.fonte || f.arquivo || f.tipo).join(', ')}. Troque por material licenciado ou registre a licença.`);
   const naoVerificadas = fontes.filter((f) => f.licencaVerificada === false).length;
   if (naoVerificadas) avisos.push(`${naoVerificadas} fonte(s) com licença NÃO verificada${relaxado ? ' (modo relaxado)' : ''}: revisar antes de publicar comercialmente.`);
 

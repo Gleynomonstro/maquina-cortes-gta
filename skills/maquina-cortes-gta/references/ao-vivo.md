@@ -13,6 +13,14 @@ Os **curtos saem de dentro dos longos**: primeiro você decide o que vira vídeo
 
 `E` = `~/.maquina-cortes-gta/engine/scripts`. `L` = a pasta da live: `./lives/<streamer>-<aaaa-mm-dd>/`. Todos os tempos em `longos.json` e no diário são **segundos da live** (desde o começo da gravação).
 
+## Direitos autorais (modo estrito, sempre ligado)
+
+- `licencas: "estrito"` em `config/canais/<streamer>.json`: só entra material com licença verificada; insert ou SFX de terceiros sem licença **reprova** o corte.
+- Todo curto sai com `fontes` e `checagem` no JSON. Antes de entregar, confira `aprovado: true` e leia os avisos.
+- Se `autorizacao.registrada` for `false`, diga ao usuário em destaque que o corte NÃO deve ser publicado até a permissão do streamer ser registrada em `detalhes`.
+- Música licenciada do jogo/streamer: se tocar na live, avise que pode gerar Content ID no YouTube; prefira trechos sem música alta de fundo.
+- Vídeos longos têm o mesmo aviso de autorização na entrega.
+
 ## Prioridades (o que vale vídeo)
 
 1. **Missão completa**, do começo ao fim, num vídeo só, mesmo que dure horas. Missões principais e secundárias grandes (assaltos, sequências de história).

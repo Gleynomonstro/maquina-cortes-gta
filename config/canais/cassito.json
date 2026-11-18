@@ -1,0 +1,49 @@
+{
+  "nome": "cassito (Twitch)",
+  "idioma": "pt",
+  "licencas": "relaxado",
+  "trilhaJogo": null,
+  "autorizacao": {
+    "registrada": false,
+    "detalhes": "PENDENTE: live do Cassito, sem permissão registrada."
+  },
+  "cameras": [
+    {
+      "nome": "cassito",
+      "rect": {
+        "x": 1490,
+        "y": 420,
+        "w": 405,
+        "h": 228
+      },
+      "rosto": {
+        "x": 0.6,
+        "y": 0.38
+      }
+    }
+  ],
+  "jogo": {
+    "x": 150,
+    "y": 0,
+    "w": 1320,
+    "h": 1080
+  },
+  "marca": {
+    "perfil": "@capivaracity.vi",
+    "logo": "~/.maquina-cortes-gta/logo.png",
+    "posicao": "superior-direito"
+  },
+  "cores": {
+    "palavraAtiva": "#FFD400",
+    "secundaria": "#9DB4D0",
+    "gancho": "#FFD400",
+    "cartao": [
+      "#2B0A4A",
+      "#C2185B"
+    ]
+  },
+  "midiaPropria": null,
+  "sfx": "~/.maquina-cortes-gta/sfx",
+  "musica": null,
+  "rockstarAprovadas": []
+}

@@ -6,3 +6,4 @@ node_modules/
 *.wav
 .DS_Store
 __pycache__/
+/lives/

@@ -86,7 +86,7 @@ node E/montar-longo.mjs L ID_DO_VIDEO
 
 Gera `L/longos/ID.mp4` e `L/longos/ID-capitulos.txt` (para colar na descrição do YouTube). `--qualidade normal` dá arquivo menor e demora mais. Enquanto um longo renderiza, continue o ciclo dos blocos normalmente, mas **não renderize dois longos ao mesmo tempo** (o computador não aguenta).
 
-**7. Escolher os curtos do bloco**: de 1 a 4 por bloco, só de momentos **dentro dos trechos dos longos** (o clímax da missão, uma descoberta, uma reação, uma frase forte). Use as regras de gancho do `SKILL.md` (passo 5 e `ganchos.md`): 20 a 60 s, começa no gancho, termina no payoff, nota ≥ 6, sem repetir assunto de um curto anterior (confira no diário). Os tempos do `cuts.json` são **locais do bloco** (tempo da live − `offset`). `id` com o bloco na frente: `b007-01-assalto-ao-banco`. Grave `TRABALHO/cuts.json` e renderize:
+**7. Escolher os curtos do bloco**: de 1 a 4 por bloco, **incluindo reações fortes durante cutscene (jogo pausado ou não), mesmo sem gameplay: são momentos-chave (ver skill `deteccao-momentos`)**; só de momentos **dentro dos trechos dos longos** (o clímax da missão, uma descoberta, uma reação, uma frase forte). Use as regras de gancho do `SKILL.md` (passo 5 e `ganchos.md`): 20 a 60 s, começa no gancho, termina no payoff, nota ≥ 6, sem repetir assunto de um curto anterior (confira no diário). Os tempos do `cuts.json` são **locais do bloco** (tempo da live − `offset`). `id` com o bloco na frente: `b007-01-assalto-ao-banco`. Grave `TRABALHO/cuts.json` e renderize:
 
 ```bash
 node E/build.mjs "TRABALHO" L/curtos

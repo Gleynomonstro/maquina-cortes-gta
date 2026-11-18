@@ -11,6 +11,10 @@ Entrada: a transcrição (`node ~/.maquina-cortes-gta/engine/scripts/transcript-
 
 Corte vertical = **momento explosivo do streamer**: rage, risada de verdade, espanto/susto, elogio empolgado ou xingamento ao jogo, descoberta de algo secreto, ação forte na tela com reação junto. O chat confirma, mas não decide sozinho. Momento calmo, informativo ou de contexto vai para o vídeo longo, não para o corte. **Só nota 7+.** Em live, meça antes com `skills/live-capture/scripts/sinais.mjs` (energia 0–10 por janela de 5 s, com rótulos) e use a tabela de nota de `skills/live-capture/SKILL.md`.
 
+## Reação em cutscene (18/11/2026, pedido do usuário)
+
+**Reação forte durante cutscene vale corte, mesmo sem gameplay.** Se o streamer pausa o jogo na cutscene porque se chocou (grito, "PAROU", risada, indignação), ou reage alto a uma cena, isso é momento-chave: corte do instante da cena com a reação, o jogo pausado/cutscene embaixo e o streamer em cima. Ao ler o bloco, procure: fala em volume alto, pausas no meio da cutscene (quadro parado com o streamer falando), comentários sobre personagem/cena/plot twist. Não descarte por "não tem gameplay".
+
 ## O que procurar (em ordem de força)
 
 1. **Reação forte a algo na tela**: choque, gargalhada, indignação ("QUE ISSO?", "INJOGÁVEL"). O que ele vê precisa caber num insert `origem`.

@@ -1,0 +1,11 @@
+{
+  "ativo": true,
+  "duracao": 12,
+  "titulo": "OBRIGADO POR ASSISTIR!",
+  "botaoInscrever": "INSCREVA-SE NO CANAL",
+  "botaoSeguir": "SIGA O CANAL",
+  "rodape": "Deixe seu like e ative o sininho",
+  "corFundo": "0x0B0B14",
+  "corInscrever": "0xFF1E3C",
+  "corSeguir": "0xFFD400"
+}

@@ -19,6 +19,7 @@ import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {acrescentarTelaFinal} from './tela-final.mjs';
 import {PROBE, drawtextFont, filterPath, hms, listBlocks, probeDuration, readJson, writeJson} from './live-comum.mjs';
 
 const args = process.argv.slice(2);
@@ -186,6 +187,11 @@ for (const [i, p] of partes.entries()) {
 fs.writeFileSync(path.join(tmp, 'lista.txt'), lista.join('\n'));
 const final = path.join(outDir, `${id}.mp4`);
 execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', path.join(tmp, 'lista.txt'), '-c', 'copy', '-movflags', '+faststart', final]);
+// tela de finalização ("obrigado por assistir", inscreva-se, siga o canal); desligue com --sem-tela-final
+if (!args.includes('--sem-tela-final')) {
+  const comTela = path.join(tmp, 'com-tela.mp4');
+  if (acrescentarTelaFinal(final, comTela, {preset}) === comTela) fs.copyFileSync(comTela, final);
+}
 const duracao = probeDuration(final);
 
 // capítulos no formato da descrição do YouTube (o primeiro precisa ser 0:00)

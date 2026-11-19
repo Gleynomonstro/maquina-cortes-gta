@@ -114,6 +114,13 @@ cfg.whisperModel = cfg.whisperModel || 'small';
 cfg.language = cfg.language || 'pt';
 writeConfig(cfg);
 
+// tela final dos vídeos longos: copia o modelo de config se ainda não existe
+{
+  const modelo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'finalizacao', 'tela-final.json');
+  const dest = path.join(HOME, 'tela-final.json');
+  if (fs.existsSync(modelo) && !fs.existsSync(dest)) fs.copyFileSync(modelo, dest);
+}
+
 // motor (Remotion): copia o template e instala as dependências
 if (!s0.engine) {
   console.log('> Copiando o motor para', ENGINE);

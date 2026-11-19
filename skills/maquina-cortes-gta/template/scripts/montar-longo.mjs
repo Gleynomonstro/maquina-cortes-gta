@@ -133,6 +133,30 @@ const atempo = (v) => {
   f.push(`atempo=${r.toFixed(4)}`);
   return f.join(',');
 };
+// pop-up "INSCREVA-SE" / "DEIXE SEU LIKE" 2 vezes no vídeo: uma nos primeiros 3 min e outra nos últimos 3 min
+const CTA_DUR = 6;
+const totalEst = partes.reduce((s, p) => s + p.dur / p.vezes, 0);
+const ctaFont = drawtextFont();
+const janelasCta = ctaFont && totalEst > 30
+  ? [Math.min(90, totalEst * 0.2), Math.max(totalEst - 120, totalEst * 0.5)].map((a) => [a, a + CTA_DUR])
+  : [];
+if (!ctaFont && totalEst > 30) console.warn('Sem fonte para o pop-up de inscrição: o vídeo sai sem ele.');
+// filtros do pop-up para uma parte que vai de tOutParte até tOutParte + durOut (tempo de saída)
+const filtrosCta = (tOutParte, durOut) => {
+  const f = [];
+  for (const [a, b] of janelasCta) {
+    const la = Math.max(0, a - tOutParte);
+    const lb = Math.min(durOut, b - tOutParte);
+    if (lb - la < 0.3) continue;
+    const S = a - tOutParte;
+    const E = b - tOutParte;
+    const quando = `enable='between(t,${la.toFixed(3)},${lb.toFixed(3)})':alpha='min(min(1,(t-${S.toFixed(3)})/0.3),(${E.toFixed(3)}-t)/0.3)'`;
+    f.push(`drawtext=fontfile='${ctaFont}':text='INSCREVA-SE':fontsize=50:fontcolor=white:box=1:boxcolor=0xFF1E3C@0.95:boxborderw=26:x=(w/2)-text_w-16:y=h-240:${quando}`);
+    f.push(`drawtext=fontfile='${ctaFont}':text='DEIXE SEU LIKE':fontsize=50:fontcolor=black:box=1:boxcolor=0xFFD400@0.95:boxborderw=26:x=(w/2)+16:y=h-240:${quando}`);
+  }
+  return f;
+};
+
 const lista = [];
 const capitulos = [];
 let tOut = 0;
@@ -142,11 +166,13 @@ for (const [i, p] of partes.entries()) {
   const durOut = p.dur / p.vezes;
   const fade = Math.min(0.06, durOut / 4);
   const vf = `[0:v]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${FPS}${p.vezes > 1 ? `,setpts=PTS/${p.vezes}` : ''}[v0]`;
-  const wmF = wm ? `;[v0][1:v]overlay=W-w-40:36[v]` : ';[v0]null[v]';
+  const wmF = wm ? `;[v0][1:v]overlay=W-w-40:36[v1]` : ';[v0]null[v1]';
+  const cta = filtrosCta(tOut, durOut);
+  const ctaF = cta.length ? `;[v1]${cta.join(',')}[v]` : ';[v1]null[v]';
   const af = `[0:a]aresample=48000${p.vezes > 1 ? `,${atempo(p.vezes)}` : ''},afade=t=in:d=${fade},afade=t=out:st=${Math.max(0, durOut - fade).toFixed(3)}:d=${fade}[a]`;
   execFileSync('ffmpeg', [
     '-y', '-v', 'error', ...PROBE, '-ss', p.ss.toFixed(3), '-t', p.dur.toFixed(3), '-i', p.arquivo, ...(wm ? ['-i', wm] : []),
-    '-filter_complex', `${vf}${wmF};${af}`,
+    '-filter_complex', `${vf}${wmF}${ctaF};${af}`,
     '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-preset', preset, '-crf', '21', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '160k', '-ac', '2', '-t', durOut.toFixed(3), out,
   ]);

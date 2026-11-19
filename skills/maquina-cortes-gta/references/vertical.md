@@ -63,6 +63,8 @@ Tempos em **segundos do vídeo de origem** (os mesmos do `transcript-text.mjs`).
 
 **Quando pôr insert (feedback de 15/11/2026):** só para **preencher vazio**: imagem de baixo parada (`node E/trechos-parados.mjs work config/canais/<canal>.json INICIO FIM` mostra onde) ou o streamer falando de algo que não está na tela. Se está acontecendo alguma coisa embaixo, deixe a tela dividida rolar. Prefira o **próprio vídeo** a clipe genérico: o streamer fala da mulher atirando → `zoom` na mulher, ou `replay` do momento em que ela atirou. Clipe de fora só quando ele cita algo que não é do jogo e que combina de verdade (FIFA, Rio); nada de associação literal fraca ("videogame" → controle de Xbox).
 
+**Pop-up final (18/11/2026, pedido do usuário):** nos últimos 5 s de todo corte vertical, embaixo (y ≈ 1090), aparecem dois botões: "INSCREVA-SE" (vermelho) e "DEIXE SEU LIKE" (amarelo, com ícone de joinha). Entra com mola e some nos últimos 8 quadros. Desligue com `"cta": false` no `cortes.json`; a duração é `ctaDur` (padrão 5 s). Implementado em `template/src/Vertical.jsx` (`EndCta`).
+
 **Transições:** todo insert entra e sai com o mesmo fade curto (0,2 s). Dois inserts colados viram fusão (o de baixo fica até o de cima terminar de aparecer).
 
 **Layout por vídeo:** a câmera e a área do jogo mudam de VOD para VOD; ponha `"layoutOrigem": {"cameras": [...], "jogo": {...}}` no `cortes.json` para sobrescrever a configuração do canal.

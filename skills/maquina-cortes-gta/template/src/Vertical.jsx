@@ -305,6 +305,29 @@ const Secondary = ({items, cor, faixas}) => {
   );
 };
 
+// pop-up final (últimos 5 s, embaixo): "INSCREVA-SE" e "DEIXE SEU LIKE". Entra com mola, pulsa de leve e some no fim.
+const EndCta = ({frames}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const pop = spring({frame, fps, config: {damping: 10, stiffness: 170}});
+  const out = interpolate(frame, [frames - 8, frames], [1, 0], {extrapolateLeft: 'clamp'});
+  const pulse = 1 + 0.035 * Math.sin((frame / fps) * Math.PI * 2 * 1.2);
+  const pill = {fontFamily, fontWeight: 900, fontSize: 40, lineHeight: 1, textTransform: 'uppercase', color: '#fff', WebkitTextStroke: '5px #000', paintOrder: 'stroke fill', padding: '26px 30px', borderRadius: 999, boxShadow: '0 10px 0 rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', gap: 14, whiteSpace: 'nowrap'};
+  return (
+    <div style={{position: 'absolute', left: 0, right: 0, top: 1090, display: 'flex', justifyContent: 'center', opacity: out}}>
+      <div style={{display: 'flex', gap: 18, alignItems: 'center', transform: `scale(${(0.4 + 0.6 * pop) * pulse})`, transformOrigin: 'center'}}>
+        <div style={{...pill, background: '#FF1E3C'}}>INSCREVA-SE</div>
+        <div style={{...pill, background: '#FFD400', color: '#000', WebkitTextStroke: '0px #000', textShadow: 'none'}}>
+          <svg width="46" height="46" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#000" d="M2 9h4v12H2zM8 9.5l4.6-6.4c.5-.7 1.6-.3 1.6.6V9h5.2c1.3 0 2.3 1.2 2.1 2.5l-1.3 8c-.2 1-1 1.7-2 1.7H8z" />
+          </svg>
+          DEIXE SEU LIKE
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const POS = {
   'superior-direito': {top: 150, right: 40},
   'superior-esquerdo': {top: 150, left: 40},
@@ -320,6 +343,9 @@ const Watermark = ({logo, name, posicao}) => (
 
 export const Vertical = (p) => {
   let offset = 0;
+  const totalFrames = p.shots.reduce((n, shot) => n + Math.max(1, Math.round((shot.to - shot.from) * 30)), 0);
+  // pop-up de inscrição/like nos últimos 5 s (desligue com "cta": false no cortes.json, se precisar)
+  const ctaFrames = p.cta === false ? 0 : Math.min(totalFrames, Math.round((p.ctaDur ?? 5) * 30));
   return (
     <AbsoluteFill style={{background: '#000'}}>
       {p.shots.map((shot, i) => {
@@ -348,6 +374,11 @@ export const Vertical = (p) => {
       <Sequence from={0} durationInFrames={Math.round(p.hook.dur * 30)}>
         <Hook texto={p.hook.texto} cor={p.cores.gancho} frames={Math.round(p.hook.dur * 30)} />
       </Sequence>
+      {ctaFrames > 0 ? (
+        <Sequence from={totalFrames - ctaFrames} durationInFrames={ctaFrames}>
+          <EndCta frames={ctaFrames} />
+        </Sequence>
+      ) : null}
       <Watermark logo={p.watermark.logo} name={p.watermark.name} posicao={p.watermark.posicao} />
       {p.sfx.map((s, i) => (
         <Sequence key={`x${i}`} from={Math.max(0, Math.round(s.at * 30))} durationInFrames={90}>

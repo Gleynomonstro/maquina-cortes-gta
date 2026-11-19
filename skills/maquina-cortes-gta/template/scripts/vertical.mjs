@@ -782,9 +782,9 @@ function masterAudio(raw, final) {
   let r = medir(final);
   // som com picos altos (jogo, gritos): o loudnorm linear não chega a -14 sem estourar o pico. Corrige com ganho +
   // limitador (pico máximo ~-1,5 dBFS) e mede de novo, até 2 vezes
-  for (let i = 0; i < 2 && Math.abs(r.integrado + 14) > 0.5; i++) {
+  for (let i = 0; i < 3 && (Math.abs(r.integrado + 14) > 0.5 || r.picoReal > -1); i++) {
     const tmp = final.replace(/\.mp4$/, '.ajuste.mp4');
-    execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', final, '-af', `volume=${(-14 - r.integrado).toFixed(2)}dB,alimiter=limit=0.84:attack=5:release=50:level=false,aresample=48000`, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', tmp]);
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', final, '-af', `volume=${(-14 - r.integrado).toFixed(2)}dB,alimiter=limit=${r.picoReal > -1 ? 0.72 : 0.84}:attack=5:release=50:level=false,aresample=48000`, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-movflags', '+faststart', tmp]);
     fs.renameSync(tmp, final);
     r = medir(final);
   }

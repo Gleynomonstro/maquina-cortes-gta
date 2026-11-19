@@ -76,6 +76,13 @@ Tempos em **segundos do vídeo de origem** (os mesmos do `transcript-text.mjs`).
 **Referência fora do GTA = insert:** quando o streamer cita algo que não é do GTA (outro jogo, cidade, país, marca, pessoa, filme), cubra a fala com um `broll` desse assunto (ex.: "É tipo FIFA?" → gameplay de FIFA; "o Rio não é assim" → Rio de Janeiro; "coisa de americano" → bandeira dos EUA).
 | `secundarias` | Falas do jogo/trailer **traduzidas**; os trechos saem da legenda principal. |
 
+## O que cortar dentro de um curto (19/11/2026, pedido do usuário)
+
+- **Duração mínima de 35 s.** Os cortes saem de 35 a 60 s. Um trecho de carregamento ou menu que tenha só um comentário curto (menos de 35 s) não vira corte sozinho.
+- **Falha engraçada ou com raiva vale corte** (morte engraçada, xingamento, frustração): mostra o humor do streamer e costuma ter nota alta.
+- **Streamer fora do quadro:** quando, por um momento, ele não aparece na câmera (saiu, virou de costas, a câmera saiu do enquadramento), esse trecho sai na hora, com corte seco. Hoje é decisão manual (`trechos` no `cuts.json`), vista nos quadros; o `vertical.mjs` ainda não detecta isso sozinho.
+- Carregamento, menu, pausa e AFK saem, a menos que haja uma fala de interesse que mantenha o corte.
+
 ## O que o `vertical.mjs` garante
 
 - Pausas acima de 0,2 s entre falas são removidas, cortando sempre entre palavras.

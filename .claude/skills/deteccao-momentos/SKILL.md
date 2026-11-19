@@ -22,6 +22,7 @@ Corte vertical = **momento explosivo do streamer**: rage, risada de verdade, esp
 3. **Fato concreto**: número, data, nome, preço, tamanho ("19 de novembro", "212 GB").
 4. **História curta com virada**: começo, problema, desfecho em menos de 45 s.
 5. **Interação com o chat** que se entende sem contexto.
+6. **Falha engraçada ou com raiva** (morte, xingamento, desabafo depois de uma tentativa perdida): mostra a frustração do streamer e vale corte.
 
 Descarte: trechos que dependem do que veio antes, leitura de tela sem reação, silêncio longo, conversa sobre outro assunto sem gancho, e trechos onde o whisper repetiu frases (sinal de transcrição ruim: confira no áudio antes de usar).
 

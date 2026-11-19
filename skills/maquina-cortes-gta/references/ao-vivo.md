@@ -77,8 +77,9 @@ node E/transcript-text.mjs "TRABALHO" OFFSET
 
 - **Missão começou**: crie um vídeo `{"tipo": "missao", "status": "aberto"}` com um trecho a partir de ~10 s antes do começo (a fala que introduz a missão). Enquanto ela continua, **estenda o `fim`** a cada bloco.
 - **Durante a missão**, tire o que deixa o vídeo lento, com `remover`:
-  - tentativas que falharam: mantenha **a tentativa que deu certo**; das que falharam, deixe no máximo a primeira morte se for engraçada ou tensa (até ~20 s) e tire o resto;
-  - carregamento, menu, pausa, AFK, leitura de chat sem relação com o jogo;
+  - tentativas que falharam: mantenha **a tentativa que deu certo**. As que falharam **ficam** quando mostram a frustração do streamer (raiva, xingamento, desabafo) ou uma morte engraçada ou tensa (até ~20 s de cada uma); o resto sai;
+  - carregamento e menu **longos** (mais de ~30 s) sem fala de interesse saem. Se o streamer comenta algo sobre o jogo durante o carregamento ou o menu, **fica**, mesmo curto: no longo, o comentário vale; no curto, só entra se o trecho inteiro passar de 35 s;
+  - pausa, AFK e leitura de chat sem relação com o jogo saem;
   - silêncio longo (mais de ~8 s sem fala nem ação).
 - **Viagens longas sem fala** (dirigir até o objetivo): use `acelerar` com `"vezes": 2` a `4` em vez de cortar, para manter a continuidade. Se o streamer estiver falando algo bom durante a viagem, não acelere.
 - Um `capitulo` em cada trecho que marca uma etapa (ex.: "O plano", "A fuga"). Para a missão ter capítulos, divida-a em vários trechos seguidos, um por etapa.
